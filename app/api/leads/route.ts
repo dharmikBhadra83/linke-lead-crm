@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
 
     // Transform leads to include lastStatusUpdater
     // Ensure all date fields are included (even if null)
-    const leadsWithLastUpdater = leads.map(lead => ({
+    const leadsWithLastUpdater = leads.map((lead: typeof leads[0]) => ({
       ...lead,
       textedAt: lead.textedAt || null,
       firstFollowupAt: lead.firstFollowupAt || null,
