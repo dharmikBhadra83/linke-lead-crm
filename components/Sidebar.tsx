@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { LayoutDashboard, LogOut, X, Menu } from 'lucide-react'
+import { LayoutDashboard, BarChart3, LogOut, X, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -34,6 +34,12 @@ export function Sidebar({ user, onLogout, isOpen: controlledIsOpen, onToggle }: 
 
   const menuItems = [
     {
+      label: 'Dashboard',
+      icon: BarChart3,
+      path: '/dashboard/performance',
+      active: pathname === '/dashboard/performance',
+    },
+    {
       label: 'Leads',
       icon: LayoutDashboard,
       path: '/dashboard',
@@ -58,7 +64,7 @@ export function Sidebar({ user, onLogout, isOpen: controlledIsOpen, onToggle }: 
       {/* Sidebar */}
       <div
         className={cn(
-          'flex flex-col h-screen bg-card border-r border-border transition-all duration-300 ease-in-out relative',
+          'flex flex-col h-screen bg-card border-r border-border transition-all duration-300 ease-in-out fixed left-0 top-0 z-40',
           isOpen ? 'w-64' : 'w-0 -translate-x-full overflow-hidden'
         )}
       >
