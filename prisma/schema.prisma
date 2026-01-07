@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  admin
+  lead_gen
+  outreach
+}
+
+enum LeadStatus {
+  new
+  requested
+  texted
+  replied
+  meeting_booked
+  first_followup
+  second_followup
+  junk
+  closed
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  role      UserRole @default(outreach)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignedLeads Lead[] @relation("AssignedLeads")
+  statusHistory StatusHistory[]
+
+  @@map("users")
+}
+
+model Lead {
+  id              String     @id @default(cuid())
+  name            String
+  email           String?
+  company         String?
+  profileUrl      String?
+  postUrl         String?
+  website         String?
+  status          LeadStatus @default(new)
+  assignedToId    String?
+  notes           String?
+  textedAt        DateTime?
+  firstFollowupAt DateTime?
+  secondFollowupAt DateTime?
+  repliedAt       DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  assignedTo User?           @relation("AssignedLeads", fields: [assignedToId], references: [id], onDelete: SetNull)
+  statusHistory StatusHistory[]
+
+  @@index([status])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([textedAt])
+  @@index([firstFollowupAt])
+  @@index([secondFollowupAt])
+  @@index([repliedAt])
+  @@map("leads")
+}
+
+model StatusHistory {
+  id        String     @id @default(cuid())
+  leadId   String
+  userId   String
+  oldStatus LeadStatus?
+  newStatus LeadStatus
+  reason   String?
+  createdAt DateTime   @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("status_history")
+}
