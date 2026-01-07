@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { requireRole } from '@/lib/auth'
 
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
+
 // GET /api/users - Get users (filtered by role if specified)
 export async function GET(request: NextRequest) {
   try {

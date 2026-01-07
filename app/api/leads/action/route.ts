@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { runAutomationRules } from '@/lib/automation'
 
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
+
 // GET /api/leads/action - Get leads filtered by action only
 export async function GET(request: NextRequest) {
   try {

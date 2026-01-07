@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Sidebar } from '@/components/Sidebar'
@@ -122,43 +122,7 @@ export default function DashboardPage() {
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
-  useEffect(() => {
-    checkSession()
-  }, [])
-
-  // Handle filter changes - reset the other filter when one is selected
-  useEffect(() => {
-    if (user) {
-      // When status filter changes to non-"all", reset action filter
-      if (statusFilter && statusFilter !== 'all') {
-        setFilter('all')
-      }
-    }
-  }, [statusFilter, user])
-
-  useEffect(() => {
-    if (user) {
-      // When action filter changes to non-"all", reset status filter
-      if (filter && filter !== 'all') {
-        setStatusFilter('all')
-      }
-    }
-  }, [filter, user])
-
-  useEffect(() => {
-    if (user) {
-      setPage(1) // Reset to first page when filters change
-      fetchLeads()
-    }
-  }, [user, search, statusFilter, filter])
-
-  useEffect(() => {
-    if (user) {
-      fetchLeads()
-    }
-  }, [page])
-
-  const checkSession = async () => {
+  const checkSession = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/session')
       const data = await response.json()
@@ -172,9 +136,9 @@ export default function DashboardPage() {
     } catch (error) {
       router.push('/login')
     }
-  }
+  }, [router])
 
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -206,7 +170,43 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [search, statusFilter, filter, page])
+
+  useEffect(() => {
+    checkSession()
+  }, [checkSession])
+
+  // Handle filter changes - reset the other filter when one is selected
+  useEffect(() => {
+    if (user) {
+      // When status filter changes to non-"all", reset action filter
+      if (statusFilter && statusFilter !== 'all') {
+        setFilter('all')
+      }
+    }
+  }, [statusFilter, user])
+
+  useEffect(() => {
+    if (user) {
+      // When action filter changes to non-"all", reset status filter
+      if (filter && filter !== 'all') {
+        setStatusFilter('all')
+      }
+    }
+  }, [filter, user])
+
+  useEffect(() => {
+    if (user) {
+      setPage(1) // Reset to first page when filters change
+      fetchLeads()
+    }
+  }, [user, search, statusFilter, filter, fetchLeads])
+
+  useEffect(() => {
+    if (user) {
+      fetchLeads()
+    }
+  }, [page, user, fetchLeads])
 
   const handleLogout = async () => {
     try {
