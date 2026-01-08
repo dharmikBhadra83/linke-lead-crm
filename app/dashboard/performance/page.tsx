@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/Sidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -9,8 +9,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { Calendar } from 'lucide-react'
+import { Calendar as CalendarIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { DateTime } from 'luxon'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+
+// Helper function to format date
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
 
 interface User {
   id: string
@@ -30,6 +52,25 @@ interface PerformanceData {
   closed: number
   junk: number
   conversionRate: number
+}
+
+interface UserPerformanceData {
+  name: string
+  totalLeads: number
+  requested: number
+  texted: number
+  firstFollowup: number
+  secondFollowup: number
+  replied: number
+  meetingBooked: number
+  closed: number
+  junk: number
+  requestedToTexted: number
+  textedToFirstFollowup: number
+  firstFollowupToSecondFollowup: number
+  secondFollowupToReplied: number
+  repliedToMeeting: number
+  meetingToClosed: number
 }
 
 // Elegant premium color palette for multi-user support
@@ -52,17 +93,20 @@ export default function PerformanceDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [performanceData, setPerformanceData] = useState<PerformanceData[]>([])
   const [users, setUsers] = useState<User[]>([])
-  const [startDate, setStartDate] = useState<string>(() => {
+  const [averageData, setAverageData] = useState<PerformanceData[]>([])
+  const [startDate, setStartDate] = useState<Date | undefined>(() => {
     const date = new Date()
     date.setDate(1) // First day of current month
-    return date.toISOString().split('T')[0]
+    return date
   })
-  const [endDate, setEndDate] = useState<string>(() => {
-    return new Date().toISOString().split('T')[0]
+  const [endDate, setEndDate] = useState<Date | undefined>(() => {
+    return new Date()
   })
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [chartLoading, setChartLoading] = useState(false)
-  const today = new Date().toISOString().split('T')[0]
+  const [userPerformanceData, setUserPerformanceData] = useState<UserPerformanceData[]>([])
+  const [aggregateData, setAggregateData] = useState<UserPerformanceData | null>(null)
+  const [userDataLoading, setUserDataLoading] = useState(false)
 
   const checkSession = useCallback(async () => {
     try {
@@ -83,20 +127,35 @@ export default function PerformanceDashboardPage() {
   const fetchPerformanceData = useCallback(async () => {
     if (!startDate || !endDate) return
 
+    // Use Luxon for consistent date formatting
+    const startDateStr = DateTime.fromJSDate(startDate).toISODate() || ''
+    const endDateStr = DateTime.fromJSDate(endDate).toISODate() || ''
+    
+    if (!startDateStr || !endDateStr) return
+
     setChartLoading(true)
     try {
-      const response = await fetch(
-        `/api/performance?startDate=${startDate}&endDate=${endDate}`
-      )
-      const data = await response.json()
+      // Fetch graph data for the chart
+      const [graphResponse, averageResponse] = await Promise.all([
+        fetch(`/api/performance/graph?startDate=${startDateStr}&endDate=${endDateStr}`),
+        fetch(`/api/performance/average?startDate=${startDateStr}&endDate=${endDateStr}`),
+      ])
 
-      if (!response.ok) {
-        console.error('Error fetching performance data:', data.error)
+      const graphData = await graphResponse.json()
+      const averageDataResult = await averageResponse.json()
+
+      if (!graphResponse.ok) {
+        console.error('Error fetching graph data:', graphData.error)
         return
       }
 
-      setPerformanceData(data.data || [])
-      setUsers(data.users || [])
+      if (!averageResponse.ok) {
+        console.error('Error fetching average data:', averageDataResult.error)
+      }
+
+      setPerformanceData(graphData.data || [])
+      setUsers(graphData.users || [])
+      setAverageData(averageDataResult.data || [])
     } catch (error) {
       console.error('Error fetching performance data:', error)
     } finally {
@@ -110,11 +169,41 @@ export default function PerformanceDashboardPage() {
     })
   }, [checkSession])
 
+  // Fetch user performance data (no date filter)
+  const fetchUserPerformanceData = useCallback(async () => {
+    setUserDataLoading(true)
+    try {
+      const response = await fetch('/api/performance/users')
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error('Error fetching user performance data:', result.error)
+        return
+      }
+
+      setUserPerformanceData(result.data || [])
+      setAggregateData(result.aggregate || null)
+    } catch (error) {
+      console.error('Error fetching user performance data:', error)
+    } finally {
+      setUserDataLoading(false)
+    }
+  }, [])
+
+  // Only fetch data on initial load, not when dates change
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && startDate && endDate) {
       fetchPerformanceData()
     }
-  }, [loading, user, fetchPerformanceData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user]) // Removed startDate, endDate, fetchPerformanceData from dependencies
+
+  // Fetch user performance data on initial load
+  useEffect(() => {
+    if (!loading && user) {
+      fetchUserPerformanceData()
+    }
+  }, [loading, user, fetchUserPerformanceData])
 
   const handleLogout = async () => {
     try {
@@ -128,28 +217,41 @@ export default function PerformanceDashboardPage() {
 
 
 
-  // Custom tool-tip component matching the reference image with theme support
+  // Custom tooltip showing daily data: total assigned and meeting booked for that day
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      // Find the date from the payload
+      const dateStr = payload[0]?.payload?.fullDate
+      
       return (
         <div className="bg-card p-5 border border-border rounded-2xl shadow-2xl min-w-[240px] relative overflow-hidden backdrop-blur-md">
           <div className="flex justify-between items-start mb-4">
             <p className="text-muted-foreground text-sm font-semibold">{label}</p>
-            <div className="flex items-center gap-1 bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full text-[10px] font-bold">
-              <span>↗</span>
-              <span>72%</span>
-            </div>
           </div>
           <div className="space-y-3">
-            {payload.map((entry: any, index: number) => (
-              <div key={`item-${index}`} className="flex items-center justify-between gap-6">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                  <span className="text-muted-foreground text-xs font-bold leading-none">{entry.name}</span>
+            {payload.map((entry: any, index: number) => {
+              // Find the user data for this date
+              const userData = performanceData.find(
+                (d) => d.userId === entry.dataKey && d.date === dateStr
+              )
+              
+              return (
+                <div key={`item-${index}`} className="space-y-1">
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                      <span className="text-muted-foreground text-xs font-bold leading-none">{entry.name}</span>
+                    </div>
+                    <span className="text-foreground text-sm font-black leading-none">{entry.value.toFixed(3)}%</span>
+                  </div>
+                  {userData && (
+                    <div className="text-xs text-muted-foreground pl-7">
+                      {userData.meetingBooked} meetings / {userData.total} assigned
+                    </div>
+                  )}
                 </div>
-                <span className="text-foreground text-sm font-black leading-none">{entry.value.toFixed(1)}%</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )
@@ -157,18 +259,41 @@ export default function PerformanceDashboardPage() {
     return null
   }
 
-  // Get all unique dates for X-axis
-  const allDates = Array.from(
-    new Set(performanceData.map((d) => d.date))
-  ).sort()
+  // Generate all dates from startDate to endDate for the X-axis using Luxon
+  // This ensures the graph shows exactly the selected date range
+  // Use useMemo to recalculate when startDate or endDate changes
+  const finalDates = useMemo(() => {
+    const dates: string[] = []
+    if (startDate && endDate) {
+      // Convert JavaScript Date to Luxon DateTime
+      const start = DateTime.fromJSDate(startDate).startOf('day')
+      const end = DateTime.fromJSDate(endDate).startOf('day')
+      
+      // Calculate number of days
+      const daysDiff = end.diff(start, 'days').days
+      
+      // Generate all dates in the range (inclusive)
+      for (let i = 0; i <= daysDiff; i++) {
+        const currentDate = start.plus({ days: i })
+        const dateStr = currentDate.toISODate()
+        if (dateStr) {
+          dates.push(dateStr)
+        }
+      }
+    } else {
+      // Fallback: use dates from API if startDate/endDate not available
+      dates.push(...Array.from(new Set(performanceData.map((d) => d.date))).sort())
+    }
+    return dates
+  }, [startDate, endDate, performanceData])
 
   // Format dates for display
-  const formattedDates = allDates.map((date) =>
-    new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  const formattedDates = finalDates.map((date: string) =>
+    new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
   )
 
   // Prepare data for recharts (one entry per date with all users' conversion rates)
-  const rechartsData = allDates.map((date) => {
+  const rechartsData = finalDates.map((date: string) => {
     const entry: Record<string, string | number> = {
       date: new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
       fullDate: date,
@@ -187,21 +312,14 @@ export default function PerformanceDashboardPage() {
   })
 
 
-  // Calculate top performers
-  const topPerformers = users
-    .map((user) => {
-      const userData = performanceData.filter((d) => d.userId === user.id)
-      const latestData = userData[userData.length - 1]
-      if (!latestData) return null
-
-      return {
-        username: user.username,
-        conversionRate: latestData.conversionRate,
-        total: latestData.total,
-        meetingBooked: latestData.meetingBooked,
-      }
-    })
-    .filter((p): p is NonNullable<typeof p> => p !== null)
+  // Use average data for top performers
+  const topPerformers = averageData
+    .map((data) => ({
+      username: data.username,
+      conversionRate: data.conversionRate,
+      total: data.total,
+      meetingBooked: data.meetingBooked,
+    }))
     .sort((a, b) => b.conversionRate - a.conversionRate)
     .slice(0, 2)
 
@@ -239,47 +357,84 @@ export default function PerformanceDashboardPage() {
             <ThemeToggle />
           </div>
 
-          {/* Date Filters - Proper Monochrome Styling */}
-          <Card className="border-2 border-slate-900 dark:border-slate-100 shadow-none bg-white dark:bg-black rounded-3xl overflow-hidden transition-all duration-300">
-            <CardHeader className="bg-slate-900 dark:bg-slate-100 py-6">
-              <CardTitle className="flex items-center gap-2 text-white dark:text-black text-lg font-black tracking-tight uppercase">
-                <Calendar className="h-5 w-5" />
-                Select Date Range
-              </CardTitle>
-              <CardDescription className="text-slate-400 dark:text-slate-600 font-medium">
-                Results limited to dates up to today
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="flex flex-col md:flex-row gap-8 items-end">
-                <div className="flex-1 w-full space-y-3">
-                  <Label htmlFor="startDate" className="text-xs font-black uppercase tracking-widest text-slate-500">Starting From</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    max={today}
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="border-2 border-slate-900 dark:border-slate-100 focus-visible:ring-0 focus-visible:border-slate-400 bg-transparent rounded-xl h-14 font-bold text-slate-900 dark:text-white"
-                  />
+          {/* Date Filters - Black, White, Grey Styling */}
+          <Card className="border-2 border-black dark:border-white shadow-lg bg-white dark:bg-black rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl">
+            <CardHeader className="bg-black dark:bg-white py-5 border-b border-black dark:border-white">
+              <CardTitle className="flex items-center gap-3 text-white dark:text-black text-lg font-bold">
+                <div className="p-2 bg-white dark:bg-black rounded-lg border-2 border-white dark:border-black">
+                  <CalendarIcon className="h-5 w-5 text-black dark:text-white" />
                 </div>
-                <div className="flex-1 w-full space-y-3">
-                  <Label htmlFor="endDate" className="text-xs font-black uppercase tracking-widest text-slate-500">Ending To</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    max={today}
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="border-2 border-slate-900 dark:border-slate-100 focus-visible:ring-0 focus-visible:border-slate-400 bg-transparent rounded-xl h-14 font-bold text-slate-900 dark:text-white"
-                  />
+                <span>Select Date Range</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 bg-white dark:bg-black">
+              <div className="flex flex-col md:flex-row gap-6 items-end">
+                <div className="flex-1 w-full space-y-2">
+                  <Label className="text-sm font-semibold text-black dark:text-white">Start Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left h-12 border-2 border-black dark:border-white focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:border-gray-500 bg-white dark:bg-black rounded-lg font-medium text-black dark:text-white shadow-sm hover:bg-gray-100 dark:hover:bg-gray-900 transition-all",
+                          !startDate && "text-gray-500 dark:text-gray-400"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4 text-black dark:text-white" />
+                        {startDate ? formatDate(startDate) : <span className="text-gray-400">Select start date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 shadow-xl border-2 border-black dark:border-white rounded-xl overflow-hidden bg-white dark:bg-black" align="start">
+                      <CalendarComponent
+                        date={startDate}
+                        onDateChange={setStartDate}
+                        maxDate={endDate || new Date()}
+                        disabled={(date) => date > new Date()}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="flex-1 w-full space-y-2">
+                  <Label className="text-sm font-semibold text-black dark:text-white">End Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left h-12 border-2 border-black dark:border-white focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:border-gray-500 bg-white dark:bg-black rounded-lg font-medium text-black dark:text-white shadow-sm hover:bg-gray-100 dark:hover:bg-gray-900 transition-all",
+                          !endDate && "text-gray-500 dark:text-gray-400"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4 text-black dark:text-white" />
+                        {endDate ? formatDate(endDate) : <span className="text-gray-400">Select end date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 shadow-xl border-2 border-black dark:border-white rounded-xl overflow-hidden bg-white dark:bg-black" align="start">
+                      <CalendarComponent
+                        date={endDate}
+                        onDateChange={setEndDate}
+                        maxDate={new Date()}
+                        minDate={startDate}
+                        disabled={(date) => date > new Date() || (startDate ? date < startDate : false)}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <Button 
                   onClick={fetchPerformanceData} 
-                  disabled={chartLoading}
-                  className="w-full md:w-auto bg-slate-900 dark:bg-slate-100 text-white dark:text-black hover:bg-slate-800 dark:hover:bg-slate-200 h-14 px-10 font-black uppercase tracking-widest transition-all rounded-xl active:scale-95 disabled:opacity-30"
+                  disabled={chartLoading || !startDate || !endDate}
+                  className="w-full md:w-auto bg-black dark:bg-white text-white dark:text-black hover:bg-gray-900 dark:hover:bg-gray-100 h-12 px-8 font-semibold transition-all rounded-lg shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 border-2 border-black dark:border-white"
                 >
-                  {chartLoading ? <Spinner className="h-4 w-4" /> : 'Apply Filter'}
+                  {chartLoading ? (
+                    <>
+                      <Spinner className="h-4 w-4" />
+                    </>
+                  ) : (
+                    <>
+                      <CalendarIcon className="h-4 w-4" />
+                      <span>Apply Filter</span>
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
@@ -291,8 +446,8 @@ export default function PerformanceDashboardPage() {
               <CardHeader>
                 <CardTitle>Top Outreach Performers This Month</CardTitle>
                 <CardDescription>
-                  Performance metrics from {new Date(startDate).toLocaleDateString()} to{' '}
-                  {new Date(endDate).toLocaleDateString()}
+                  Performance metrics from {startDate ? startDate.toLocaleDateString() : 'N/A'} to{' '}
+                  {endDate ? endDate.toLocaleDateString() : 'N/A'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -313,7 +468,7 @@ export default function PerformanceDashboardPage() {
                       </div>
                       <div className="text-right">
                         <div className="font-semibold">
-                          {performer.conversionRate.toFixed(2)}%
+                          {performer.conversionRate.toFixed(3)}%
                         </div>
                         <div className="text-sm text-muted-foreground">
                           = ({performer.meetingBooked} meetings / {performer.total} total) × 100
@@ -326,15 +481,13 @@ export default function PerformanceDashboardPage() {
             </Card>
           )}
 
+
           {/* Elegant Performance Overview Chart */}
           <Card className="shadow-2xl border-border rounded-3xl overflow-hidden bg-white dark:bg-card chart-fade-in">
             <CardHeader className="p-8 pb-0">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-xl font-bold text-foreground">Performance Overview</CardTitle>
-                  <CardDescription className="text-muted-foreground text-sm mt-1">
-                    Sales and advertising metrics breakdown
-                  </CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -364,7 +517,7 @@ export default function PerformanceDashboardPage() {
                         )
                       })}
                     </defs>
-                    <CartesianGrid vertical={true} horizontal={false} strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
+                    <CartesianGrid horizontal={false} stroke="#eee" strokeDasharray="5 5" /> 
                     <XAxis
                       dataKey="date"
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontWeight: 500 }}
@@ -422,83 +575,95 @@ export default function PerformanceDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Performance Table */}
-          {performanceData.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Detailed Performance Metrics</CardTitle>
-                <CardDescription>
-                  Breakdown by user and date
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-2 font-medium">Date</th>
-                        <th className="text-left p-2 font-medium">User</th>
-                        <th className="text-right p-2 font-medium">Total</th>
-                        <th className="text-right p-2 font-medium">Requested</th>
-                        <th className="text-right p-2 font-medium">Texted</th>
-                        <th className="text-right p-2 font-medium">Replied</th>
-                        <th className="text-right p-2 font-medium">Meeting Booked</th>
-                        <th className="text-right p-2 font-medium">Closed</th>
-                        <th className="text-right p-2 font-medium">Junk</th>
-                        <th className="text-right p-2 font-medium">Conversion Rate (%)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {performanceData
-                        .sort((a, b) => {
-                          const dateCompare = a.date.localeCompare(b.date)
-                          if (dateCompare !== 0) return dateCompare
-                          return a.username.localeCompare(b.username)
-                        })
-                        .map((data, index) => (
-                          <tr
-                            key={`${data.userId}-${data.date}`}
-                            className="border-b border-border hover:bg-secondary/50"
-                          >
-                            <td className="p-2">
-                              {new Date(data.date).toLocaleDateString('en-GB', {
-                                day: 'numeric',
-                                month: 'short',
-                              })}
-                            </td>
-                            <td className="p-2">
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="w-3 h-3 rounded-full"
-                                  style={{
-                                    backgroundColor:
-                                      USER_COLORS[
-                                        users.findIndex((u) => u.id === data.userId) %
-                                          USER_COLORS.length
-                                      ],
-                                  }}
-                                />
-                                {data.username}
-                              </div>
-                            </td>
-                            <td className="text-right p-2">{data.total}</td>
-                            <td className="text-right p-2">{data.requested}</td>
-                            <td className="text-right p-2">{data.texted}</td>
-                            <td className="text-right p-2">{data.replied}</td>
-                            <td className="text-right p-2">{data.meetingBooked}</td>
-                            <td className="text-right p-2">{data.closed}</td>
-                            <td className="text-right p-2">{data.junk}</td>
-                            <td className="text-right p-2 font-medium">
-                              {data.conversionRate.toFixed(2)}%
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
+   {/* User Performance Table */}
+   <Card className="shadow-2xl border-border rounded-3xl overflow-hidden bg-white dark:bg-card">
+            <CardHeader className="p-8 pb-0">
+              <CardTitle className="text-2xl font-bold text-foreground">User Performance Metrics</CardTitle>
+              <CardDescription className="text-muted-foreground">
+                Detailed performance breakdown for each user
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-8">
+              {userDataLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Spinner className="h-8 w-8" />
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              ) : userPerformanceData.length === 0 ? (
+                <div className="text-center py-16">
+                  <p className="text-muted-foreground">No user performance data available</p>
+                </div>
+              ) : (
+                <div className="border rounded-lg border-border overflow-hidden">
+                  <div className="overflow-x-auto w-full">
+                    <Table className="w-full" style={{ minWidth: '2400px' }}>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Name</TableHead>
+                          <TableHead className="min-w-[120px] whitespace-nowrap font-semibold">Total Leads</TableHead>
+                          <TableHead className="min-w-[120px] whitespace-nowrap font-semibold">Requested</TableHead>
+                          <TableHead className="min-w-[120px] whitespace-nowrap font-semibold">Texted</TableHead>
+                          <TableHead className="min-w-[140px] whitespace-nowrap font-semibold">First Follow-up</TableHead>
+                          <TableHead className="min-w-[150px] whitespace-nowrap font-semibold">Second Follow-up</TableHead>
+                          <TableHead className="min-w-[120px] whitespace-nowrap font-semibold">Replied</TableHead>
+                          <TableHead className="min-w-[140px] whitespace-nowrap font-semibold">Meeting Booked</TableHead>
+                          <TableHead className="min-w-[120px] whitespace-nowrap font-semibold">Closed</TableHead>
+                          <TableHead className="min-w-[120px] whitespace-nowrap font-semibold">Junk</TableHead>
+                          <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Requested → Texted (%)</TableHead>
+                          <TableHead className="min-w-[180px] whitespace-nowrap font-semibold">Texted → First Follow-up (%)</TableHead>
+                          <TableHead className="min-w-[200px] whitespace-nowrap font-semibold">First Follow-up → Second Follow-up (%)</TableHead>
+                          <TableHead className="min-w-[200px] whitespace-nowrap font-semibold">Second Follow-up → Replied (%)</TableHead>
+                          <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Replied → Meeting (%)</TableHead>
+                          <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Meeting → Closed (%)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {userPerformanceData.map((user: UserPerformanceData, index: number) => (
+                          <TableRow key={user.name}>
+                            <TableCell className="font-medium">{user.name}</TableCell>
+                            <TableCell>{user.totalLeads}</TableCell>
+                            <TableCell>{user.requested}</TableCell>
+                            <TableCell>{user.texted}</TableCell>
+                            <TableCell>{user.firstFollowup}</TableCell>
+                            <TableCell>{user.secondFollowup}</TableCell>
+                            <TableCell>{user.replied}</TableCell>
+                            <TableCell>{user.meetingBooked}</TableCell>
+                            <TableCell>{user.closed}</TableCell>
+                            <TableCell>{user.junk}</TableCell>
+                            <TableCell>{user.requestedToTexted.toFixed(3)}%</TableCell>
+                            <TableCell>{user.textedToFirstFollowup.toFixed(3)}%</TableCell>
+                            <TableCell>{user.firstFollowupToSecondFollowup.toFixed(3)}%</TableCell>
+                            <TableCell>{user.secondFollowupToReplied.toFixed(3)}%</TableCell>
+                            <TableCell>{user.repliedToMeeting.toFixed(3)}%</TableCell>
+                            <TableCell>{user.meetingToClosed.toFixed(3)}%</TableCell>
+                          </TableRow>
+                        ))}
+                        {aggregateData && (
+                          <TableRow className="bg-muted/30 font-bold">
+                            <TableCell className="font-bold">{aggregateData.name}</TableCell>
+                            <TableCell className="font-bold">{aggregateData.totalLeads}</TableCell>
+                            <TableCell className="font-bold">{aggregateData.requested}</TableCell>
+                            <TableCell className="font-bold">{aggregateData.texted}</TableCell>
+                            <TableCell className="font-bold">{aggregateData.firstFollowup}</TableCell>
+                            <TableCell className="font-bold">{aggregateData.secondFollowup}</TableCell>
+                            <TableCell className="font-bold">{aggregateData.replied}</TableCell>
+                            <TableCell className="font-bold">{aggregateData.meetingBooked}</TableCell>
+                            <TableCell className="font-bold">{aggregateData.closed}</TableCell>
+                            <TableCell className="font-bold">{aggregateData.junk}</TableCell>
+                            <TableCell className="font-bold">{aggregateData.requestedToTexted.toFixed(3)}%</TableCell>
+                            <TableCell className="font-bold">{aggregateData.textedToFirstFollowup.toFixed(3)}%</TableCell>
+                            <TableCell className="font-bold">{aggregateData.firstFollowupToSecondFollowup.toFixed(3)}%</TableCell>
+                            <TableCell className="font-bold">{aggregateData.secondFollowupToReplied.toFixed(3)}%</TableCell>
+                            <TableCell className="font-bold">{aggregateData.repliedToMeeting.toFixed(3)}%</TableCell>
+                            <TableCell className="font-bold">{aggregateData.meetingToClosed.toFixed(3)}%</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

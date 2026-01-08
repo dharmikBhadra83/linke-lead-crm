@@ -163,7 +163,7 @@ export default function DashboardPage() {
 
       if (response.ok) {
         setLeads(data.leads || [])
-        setPagination(data.pagination || null)
+        setPagination(data.pagination)
       }
     } catch (error) {
       console.error('Error fetching leads:', error)
@@ -197,7 +197,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (user) {
-      setPage(1) // Reset to first page when filters change
       fetchLeads()
     }
   }, [user, search, statusFilter, filter, fetchLeads])
@@ -274,7 +273,7 @@ export default function DashboardPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          assignedToId: selectedUserId || null,
+          assignedToId: selectedUserId,
         }),
       })
 
