@@ -87,7 +87,6 @@ export async function GET(request: NextRequest) {
         dates.push(dateStr) // Format: YYYY-MM-DD
       }
     }
-        // Debug: Log the dates generated
 
     // Get all leads assigned to users with status history
     const allLeads = await prisma.lead.findMany({

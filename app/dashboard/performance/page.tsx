@@ -87,6 +87,12 @@ const USER_COLORS = [
   '#14b8a6', // Teal
 ]
 
+// Get consistent color for a user based on their ID
+function getUserColor(userId: string, allUsers: Array<{ id: string }>): string {
+  const userIndex = allUsers.findIndex(u => u.id === userId)
+  return USER_COLORS[userIndex % USER_COLORS.length]
+}
+
 export default function PerformanceDashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
@@ -313,13 +319,19 @@ export default function PerformanceDashboardPage() {
 
 
   // Use average data for top performers
+  // Include userId to ensure consistent color mapping
   const topPerformers = averageData
-    .map((data) => ({
-      username: data.username,
-      conversionRate: data.conversionRate,
-      total: data.total,
-      meetingBooked: data.meetingBooked,
-    }))
+    .map((data) => {
+      const user = users.find(u => u.username === data.username)
+      return {
+        username: data.username,
+        userId: user?.id || '',
+        conversionRate: data.conversionRate,
+        total: data.total,
+        meetingBooked: data.meetingBooked,
+      }
+    })
+    .filter(p => p.userId) // Only include performers with valid user IDs
     .sort((a, b) => b.conversionRate - a.conversionRate)
     .slice(0, 2)
 
@@ -452,30 +464,33 @@ export default function PerformanceDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {topPerformers.map((performer, index) => (
-                    <div
-                      key={performer.username}
-                      className="flex items-center justify-between p-3 rounded-lg bg-secondary"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-4 h-4 rounded-full"
-                          style={{
-                            backgroundColor: USER_COLORS[index % USER_COLORS.length],
-                          }}
-                        />
-                        <span className="font-medium">{performer.username}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold">
-                          {performer.conversionRate.toFixed(3)}%
+                  {topPerformers.map((performer) => {
+                    const color = getUserColor(performer.userId, users)
+                    return (
+                      <div
+                        key={performer.username}
+                        className="flex items-center justify-between p-3 rounded-lg bg-secondary"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-4 h-4 rounded-full"
+                            style={{
+                              backgroundColor: color,
+                            }}
+                          />
+                          <span className="font-medium">{performer.username}</span>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          = ({performer.meetingBooked} meetings / {performer.total} total) × 100
+                        <div className="text-right">
+                          <div className="font-semibold">
+                            {performer.conversionRate.toFixed(3)}%
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            = ({performer.meetingBooked} meetings / {performer.total} total) × 100
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -507,8 +522,8 @@ export default function PerformanceDashboardPage() {
                     margin={{ top: 40, right: 30, left: 10, bottom: 20 }}
                   >
                     <defs>
-                      {users.map((user, index) => {
-                        const color = USER_COLORS[index % USER_COLORS.length]
+                      {users.map((user) => {
+                        const color = getUserColor(user.id, users)
                         return (
                           <linearGradient key={`gradient-${user.id}`} id={`color-${user.id}`} x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
@@ -547,8 +562,8 @@ export default function PerformanceDashboardPage() {
                       iconType="circle"
                       iconSize={8}
                     />
-                    {users.map((user, index) => {
-                      const color = USER_COLORS[index % USER_COLORS.length]
+                    {users.map((user) => {
+                      const color = getUserColor(user.id, users)
                       const dataKey = user.id
                       
                       return (
