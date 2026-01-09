@@ -9,15 +9,14 @@ interface GraphData {
   date: string
   userId: string
   username: string
-  total: number
-  meetingBooked: number
-  conversionRate: number // (meeting_booked / total) * 100 for this specific date
+  leadsCreated: number // Number of leads created on this specific date
 }
 
 /**
  * GET /api/performance/graph
  * Returns daily performance metrics for the graph
- * Shows conversion rate per day: (meetings booked on that day / total assigned on that day) * 100
+ * Shows number of leads created per day for each user
+ * Metric: Who brings more leads into the system
  */
 export async function GET(request: NextRequest) {
   try {
@@ -88,7 +87,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get all leads assigned to users with status history
+    // Get all leads assigned to users - only need createdAt for counting
     const allLeads = await prisma.lead.findMany({
       where: {
         assignedToId: {
@@ -98,17 +97,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         assignedToId: true,
-        status: true,
         createdAt: true,
-        statusHistory: {
-          select: {
-            newStatus: true,
-            createdAt: true,
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
       },
     })
 
@@ -118,53 +107,29 @@ export async function GET(request: NextRequest) {
 
     // admin and outreach
     for (const user of users) {
-
-        // each date
+      // each date
       for (const dateStr of dates) {
         // Use Luxon for date handling
         const date = DateTime.fromISO(dateStr).startOf('day')
         const dateStart = date
         const dateEnd = date.endOf('day')
 
-        // Get leads assigned to this user that exist (were created) on or before this date
-        const userLeads = allLeads.filter((lead) => {
+        // Count leads created ON THIS SPECIFIC DATE for this user
+        const leadsCreatedToday = allLeads.filter((lead) => {
+          if (lead.assignedToId !== user.id) return false
+          
           const leadCreatedAt = DateTime.fromJSDate(new Date(lead.createdAt))
-          return lead.assignedToId === user.id && leadCreatedAt <= dateEnd
-        })
-
-        // Count total assigned leads as of this date (cumulative)
-        let total = userLeads.length
-        
-        // Count meetings booked ON THIS SPECIFIC DATE ONLY (not cumulative)
-        let meetingBookedToday = 0
-
-        for (const lead of userLeads) {
-          // Check if meeting was booked ON THIS SPECIFIC DATE
-          const meetingBookedOnThisDate = lead.statusHistory.some((history) => {
-            const historyDate = DateTime.fromJSDate(new Date(history.createdAt))
-            return (
-              historyDate >= dateStart &&
-              historyDate <= dateEnd &&
-              history.newStatus === 'meeting_booked'
-            )
-          })
-
-          if (meetingBookedOnThisDate) {
-            meetingBookedToday++
-          }
-        }
-
-        // Daily conversion rate: (meetings booked today / total assigned on this date) * 100
-        // If no meetings booked today, show 0% (straight line)
-        const conversionRate = total > 0 ? (meetingBookedToday / total) * 100 : 0
+          return (
+            leadCreatedAt >= dateStart &&
+            leadCreatedAt <= dateEnd
+          )
+        }).length
 
         graphData.push({
           date: dateStr,
           userId: user.id,
           username: user.username,
-          total,
-          meetingBooked: meetingBookedToday,
-          conversionRate: Math.round(conversionRate * 1000) / 1000, 
+          leadsCreated: leadsCreatedToday,
         })
       }
     }

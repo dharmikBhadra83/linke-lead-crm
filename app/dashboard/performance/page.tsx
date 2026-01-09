@@ -44,13 +44,14 @@ interface PerformanceData {
   date: string
   userId: string
   username: string
+  leadsCreated: number // Number of leads created on this date
+}
+
+interface AverageData {
+  userId: string
+  username: string
   total: number
-  requested: number
-  texted: number
-  replied: number
   meetingBooked: number
-  closed: number
-  junk: number
   conversionRate: number
 }
 
@@ -99,7 +100,7 @@ export default function PerformanceDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [performanceData, setPerformanceData] = useState<PerformanceData[]>([])
   const [users, setUsers] = useState<User[]>([])
-  const [averageData, setAverageData] = useState<PerformanceData[]>([])
+  const [averageData, setAverageData] = useState<AverageData[]>([])
   const [startDate, setStartDate] = useState<Date | undefined>(() => {
     const date = new Date()
     date.setDate(1) // First day of current month
@@ -175,11 +176,22 @@ export default function PerformanceDashboardPage() {
     })
   }, [checkSession])
 
-  // Fetch user performance data (no date filter)
+  // Fetch user performance data with date filter
   const fetchUserPerformanceData = useCallback(async () => {
+    if (!startDate || !endDate) return
+    
     setUserDataLoading(true)
     try {
-      const response = await fetch('/api/performance/users')
+      // Use Luxon for consistent date formatting
+      const startDateStr = DateTime.fromJSDate(startDate).toISODate() || ''
+      const endDateStr = DateTime.fromJSDate(endDate).toISODate() || ''
+      
+      if (!startDateStr || !endDateStr) {
+        console.error('Invalid date format')
+        return
+      }
+
+      const response = await fetch(`/api/performance/users?startDate=${startDateStr}&endDate=${endDateStr}`)
       const result = await response.json()
 
       if (!response.ok) {
@@ -194,7 +206,7 @@ export default function PerformanceDashboardPage() {
     } finally {
       setUserDataLoading(false)
     }
-  }, [])
+  }, [startDate, endDate])
 
   // Only fetch data on initial load, not when dates change
   useEffect(() => {
@@ -204,12 +216,12 @@ export default function PerformanceDashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user]) // Removed startDate, endDate, fetchPerformanceData from dependencies
 
-  // Fetch user performance data on initial load
+  // Fetch user performance data when dates change or on initial load
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && startDate && endDate) {
       fetchUserPerformanceData()
     }
-  }, [loading, user, fetchUserPerformanceData])
+  }, [loading, user, startDate, endDate, fetchUserPerformanceData])
 
   const handleLogout = async () => {
     try {
@@ -234,7 +246,7 @@ export default function PerformanceDashboardPage() {
           <div className="flex justify-between items-start mb-4">
             <p className="text-muted-foreground text-sm font-semibold">{label}</p>
           </div>
-          <div className="space-y-3">
+                  <div className="space-y-3">
             {payload.map((entry: any, index: number) => {
               // Find the user data for this date
               const userData = performanceData.find(
@@ -248,11 +260,11 @@ export default function PerformanceDashboardPage() {
                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
                       <span className="text-muted-foreground text-xs font-bold leading-none">{entry.name}</span>
                     </div>
-                    <span className="text-foreground text-sm font-black leading-none">{entry.value.toFixed(3)}%</span>
+                    <span className="text-foreground text-sm font-black leading-none">{entry.value} leads</span>
                   </div>
                   {userData && (
                     <div className="text-xs text-muted-foreground pl-7">
-                      {userData.meetingBooked} meetings / {userData.total} assigned
+                      {userData.leadsCreated} lead{userData.leadsCreated !== 1 ? 's' : ''} created on this date
                     </div>
                   )}
                 </div>
@@ -298,7 +310,7 @@ export default function PerformanceDashboardPage() {
     new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
   )
 
-  // Prepare data for recharts (one entry per date with all users' conversion rates)
+  // Prepare data for recharts (one entry per date with all users' leads created)
   const rechartsData = finalDates.map((date: string) => {
     const entry: Record<string, string | number> = {
       date: new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
@@ -309,9 +321,9 @@ export default function PerformanceDashboardPage() {
       const userDataPoint = performanceData.find(
         (d) => d.userId === user.id && d.date === date
       )
-      // Use the conversion rate if available, otherwise 0
+      // Use the leads created count if available, otherwise 0
       // We use user.id as key to be safer with special characters
-      entry[user.id] = userDataPoint?.conversionRate ?? 0
+      entry[user.id] = userDataPoint?.leadsCreated ?? 0
     })
 
     return entry
@@ -464,7 +476,7 @@ export default function PerformanceDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {topPerformers.map((performer) => {
+                  {topPerformers.map((performer, index) => {
                     const color = getUserColor(performer.userId, users)
                     return (
                       <div
@@ -502,7 +514,7 @@ export default function PerformanceDashboardPage() {
             <CardHeader className="p-8 pb-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-xl font-bold text-foreground">Performance Overview</CardTitle>
+                  <CardTitle className="text-xl font-bold text-foreground">Leads Created Per Day</CardTitle>
                 </div>
               </div>
             </CardHeader>
@@ -519,7 +531,7 @@ export default function PerformanceDashboardPage() {
                 <ResponsiveContainer width="100%" height={500}>
                   <AreaChart 
                     data={rechartsData}
-                    margin={{ top: 40, right: 30, left: 10, bottom: 20 }}
+                    margin={{ top: 40, right: 30, left: 20, bottom: 20 }}
                   >
                     <defs>
                       {users.map((user) => {
@@ -542,10 +554,12 @@ export default function PerformanceDashboardPage() {
                       dy={10}
                     />
                     <YAxis
-                      domain={[-20, 110]}
+                      domain={[-5, 100]}
                       ticks={[0, 20, 40, 60, 80, 100]}
+                      allowDecimals={false}
+                      interval={0}
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontWeight: 500 }}
-                      tickFormatter={(value) => `${value}%`}
+                      tickFormatter={(value) => value >= 0 ? `${value}%` : ''}
                       stroke="#94a3b8"
                       axisLine={{ stroke: '#94a3b8', strokeWidth: 3 }}
                       tickLine={{ stroke: '#94a3b8', strokeWidth: 2 }}
@@ -573,11 +587,12 @@ export default function PerformanceDashboardPage() {
                           dataKey={dataKey}
                           stroke={color}
                           strokeWidth={3.5}
-                          fillOpacity={1}
+                          fillOpacity={0.6}
                           fill={`url(#color-${user.id})`}
                           name={user.username}
                           connectNulls={true}
                           baseValue={0}
+                          stackId={undefined}
                           animationDuration={2500}
                           animationEasing="ease-in-out"
                           activeDot={{ r: 7, stroke: 'var(--background)', strokeWidth: 3, fill: color }}

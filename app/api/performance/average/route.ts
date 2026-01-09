@@ -32,9 +32,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'startDate and endDate are required' }, { status: 400 })
     }
 
-    const start = new Date(startDateParam)
-    const end = new Date(endDateParam)
-    end.setHours(23, 59, 59, 999)
+    // Use Luxon for consistent date handling
+    const { DateTime } = await import('luxon')
+    const start = DateTime.fromISO(startDateParam, { zone: 'utc' }).startOf('day')
+    const end = DateTime.fromISO(endDateParam, { zone: 'utc' }).endOf('day')
+    
+    // Validate dates
+    if (!start.isValid || !end.isValid) {
+      return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
+    }
+    
+    if (start > end) {
+      return NextResponse.json({ error: 'Start date must be before end date' }, { status: 400 })
+    }
 
     // Get all users (admin and outreach)
     const users = await prisma.user.findMany({
@@ -88,7 +98,8 @@ export async function GET(request: NextRequest) {
     for (const user of users) {
       // Get leads assigned to this user that exist (were created) on or before end date
       const userLeads = allLeads.filter((lead) => {
-        return lead.assignedToId === user.id && new Date(lead.createdAt) <= end
+        const leadCreatedAt = DateTime.fromJSDate(new Date(lead.createdAt))
+        return lead.assignedToId === user.id && leadCreatedAt <= end
       })
 
       // Count total assigned leads and total meeting_booked (cumulative)
@@ -100,7 +111,10 @@ export async function GET(request: NextRequest) {
 
         // Determine the status of the lead as of the end date
         const statusHistoryOnDate = lead.statusHistory
-          .filter((history) => new Date(history.createdAt) <= end)
+          .filter((history) => {
+            const historyDate = DateTime.fromJSDate(new Date(history.createdAt))
+            return historyDate <= end
+          })
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
 
         const statusOnDate = statusHistoryOnDate?.newStatus || lead.status

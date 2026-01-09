@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
+import { DateTime } from 'luxon'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,12 +30,42 @@ interface UserPerformanceData {
  * Includes status counts and conversion percentages between status transitions
  * Sorted by highest performance first
  * Includes aggregate row at the end
+ * 
+ * Query parameters:
+ * - startDate (optional): ISO date string - filter leads created on or after this date
+ * - endDate (optional): ISO date string - filter leads created on or before this date
  */
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const startDateParam = searchParams.get('startDate')
+    const endDateParam = searchParams.get('endDate')
+
+    // Parse dates if provided
+    let startDate: DateTime | null = null
+    let endDate: DateTime | null = null
+
+    if (startDateParam) {
+      startDate = DateTime.fromISO(startDateParam, { zone: 'utc' }).startOf('day')
+      if (!startDate.isValid) {
+        return NextResponse.json({ error: 'Invalid startDate format' }, { status: 400 })
+      }
+    }
+
+    if (endDateParam) {
+      endDate = DateTime.fromISO(endDateParam, { zone: 'utc' }).endOf('day')
+      if (!endDate.isValid) {
+        return NextResponse.json({ error: 'Invalid endDate format' }, { status: 400 })
+      }
+    }
+
+    if (startDate && endDate && startDate > endDate) {
+      return NextResponse.json({ error: 'Start date must be before end date' }, { status: 400 })
     }
 
     // Get all admin and outreach users
@@ -59,17 +90,32 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Build where clause for leads based on date range
+    const leadWhere: any = {
+      assignedToId: {
+        in: users.map((u) => u.id),
+      },
+    }
+
+    // Filter leads by creation date if date range is provided
+    if (startDate || endDate) {
+      leadWhere.createdAt = {}
+      if (startDate) {
+        leadWhere.createdAt.gte = startDate.toJSDate()
+      }
+      if (endDate) {
+        leadWhere.createdAt.lte = endDate.toJSDate()
+      }
+    }
+
     // Get all leads assigned to these users with their status history
     const allLeads = await prisma.lead.findMany({
-      where: {
-        assignedToId: {
-          in: users.map((u) => u.id),
-        },
-      },
+      where: leadWhere,
       select: {
         id: true,
         assignedToId: true,
         status: true,
+        createdAt: true,
         statusHistory: {
           select: {
             newStatus: true,
@@ -100,18 +146,41 @@ export async function GET(request: NextRequest) {
 
       for (const lead of userLeads) {
         // Check all status history entries to see which statuses this lead reached
+        // Filter status history by date range if provided
         const statusesReached = new Set<string>()
 
-        // current lead status history
-        for (const history of lead.statusHistory) {
-          // we are storing 
+        // Filter status history by date range if provided
+        let filteredStatusHistory = lead.statusHistory
+        if (startDate || endDate) {
+          filteredStatusHistory = lead.statusHistory.filter((history) => {
+            const historyDate = DateTime.fromJSDate(new Date(history.createdAt))
+            if (startDate && historyDate < startDate) return false
+            if (endDate && historyDate > endDate) return false
+            return true
+          })
+        }
+
+        // current lead status history (filtered by date range)
+        for (const history of filteredStatusHistory) {
           statusesReached.add(history.newStatus)
         }
 
-        // current status : requested , texted
-
-        // Also include current status
-        statusesReached.add(lead.status)
+        // Also include current status if the lead was created within the date range
+        // or if we have status history within the date range
+        if (!startDate && !endDate) {
+          // No date filter - include current status
+          statusesReached.add(lead.status)
+        } else {
+          // With date filter - only include current status if lead was created in range
+          // or if we have any status history in range
+          const leadCreatedAt = DateTime.fromJSDate(new Date(lead.createdAt))
+          const leadInRange = (!startDate || leadCreatedAt >= startDate) && 
+                             (!endDate || leadCreatedAt <= endDate)
+          
+          if (leadInRange || filteredStatusHistory.length > 0) {
+            statusesReached.add(lead.status)
+          }
+        }
 
         // Track which statuses this lead reached (in order)
         // Flow: new → requested → texted → first_followup → second_followup → replied → meeting_booked → closed/junk
@@ -168,12 +237,33 @@ export async function GET(request: NextRequest) {
       const meetingBooked = leadsReachedMeeting.size
       const closed = leadsReachedClosed.size
 
-      // Count junk leads (leads that are currently junk or have been junk)
-      const junk = userLeads.filter(
-        (lead) =>
-          lead.status === 'junk' ||
-          lead.statusHistory.some((h) => h.newStatus === 'junk')
-      ).length
+      // Count junk leads (leads that are currently junk or have been junk within date range)
+      const junk = userLeads.filter((lead) => {
+        // Check if lead is currently junk and was created in date range
+        if (lead.status === 'junk') {
+          if (startDate || endDate) {
+            const leadCreatedAt = DateTime.fromJSDate(new Date(lead.createdAt))
+            const leadInRange = (!startDate || leadCreatedAt >= startDate) && 
+                               (!endDate || leadCreatedAt <= endDate)
+            if (leadInRange) return true
+          } else {
+            return true
+          }
+        }
+        
+        // Check if lead was marked as junk within date range
+        if (startDate || endDate) {
+          return lead.statusHistory.some((h) => {
+            if (h.newStatus !== 'junk') return false
+            const historyDate = DateTime.fromJSDate(new Date(h.createdAt))
+            if (startDate && historyDate < startDate) return false
+            if (endDate && historyDate > endDate) return false
+            return true
+          })
+        } else {
+          return lead.statusHistory.some((h) => h.newStatus === 'junk')
+        }
+      }).length
 
       // Calculate conversion percentages
       // Requested → Texted: (leads that reached texted / leads that reached requested) * 100
