@@ -74,6 +74,10 @@ export async function GET(request: NextRequest) {
         assignedToId: {
           in: users.map(u => u.id),
         },
+        createdAt: {
+          gte: start.toJSDate(),
+          lte: end.toJSDate(),
+        },
       },
       select: {
         id: true,
@@ -97,8 +101,7 @@ export async function GET(request: NextRequest) {
 
     for (const user of users) {
       const userLeads = allLeads.filter((lead) => {
-        const leadCreatedAt = DateTime.fromJSDate(new Date(lead.createdAt))
-        return lead.assignedToId === user.id && leadCreatedAt >= start && leadCreatedAt <= end
+        return lead.assignedToId === user.id
       })
 
       let total = 0
