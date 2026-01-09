@@ -9,7 +9,7 @@ interface AverageData {
   username: string
   total: number
   meetingBooked: number
-  conversionRate: number // (total meeting booked / total assigned) * 100
+  conversionRate: number 
 }
 
 /**
@@ -96,31 +96,24 @@ export async function GET(request: NextRequest) {
     const averageData: AverageData[] = []
 
     for (const user of users) {
-      // Get leads assigned to this user that exist (were created) on or before end date
       const userLeads = allLeads.filter((lead) => {
         const leadCreatedAt = DateTime.fromJSDate(new Date(lead.createdAt))
-        return lead.assignedToId === user.id && leadCreatedAt <= end
+        return lead.assignedToId === user.id && leadCreatedAt >= start && leadCreatedAt <= end
       })
 
-      // Count total assigned leads and total meeting_booked (cumulative)
       let total = 0
       let meetingBooked = 0
 
       for (const lead of userLeads) {
         total++
 
-        // Determine the status of the lead as of the end date
-        const statusHistoryOnDate = lead.statusHistory
-          .filter((history) => {
-            const historyDate = DateTime.fromJSDate(new Date(history.createdAt))
-            return historyDate <= end
-          })
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+        const everReachedMeetingBooked = lead.statusHistory.some(
+          (history) => history.newStatus === 'meeting_booked'
+        )
 
-        const statusOnDate = statusHistoryOnDate?.newStatus || lead.status
+        const isCurrentlyMeetingBooked = lead.status === 'meeting_booked'
 
-        // Count meeting_booked
-        if (statusOnDate === 'meeting_booked') {
+        if (everReachedMeetingBooked || isCurrentlyMeetingBooked) {
           meetingBooked++
         }
       }
