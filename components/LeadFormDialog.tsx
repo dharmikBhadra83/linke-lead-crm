@@ -80,21 +80,34 @@ export function LeadFormDialog({
   }, [open, isAdmin])
 
   useEffect(() => {
-    if (initialData) {
-      setFormData((prev) => ({ ...prev, ...initialData }))
-    } else if (!leadId) {
-      // Reset form for new lead
-      setFormData({
-        name: '',
-        email: '',
-        company: '',
-        profileUrl: '',
-        postUrl: '',
-        website: '',
-        status: 'new',
-        notes: '',
-        assignedToId: null,
-      })
+    if (open) {
+      if (initialData) {
+        // Populate form with initial data when editing
+        setFormData({
+          name: initialData.name || '',
+          email: initialData.email || '',
+          company: initialData.company || '',
+          profileUrl: initialData.profileUrl || '',
+          postUrl: initialData.postUrl || '',
+          website: initialData.website || '',
+          status: initialData.status || 'new',
+          notes: initialData.notes || '',
+          assignedToId: initialData.assignedToId || null,
+        })
+      } else if (!leadId) {
+        // Reset form for new lead
+        setFormData({
+          name: '',
+          email: '',
+          company: '',
+          profileUrl: '',
+          postUrl: '',
+          website: '',
+          status: 'new',
+          notes: '',
+          assignedToId: null,
+        })
+      }
     }
   }, [initialData, leadId, open])
 

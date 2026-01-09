@@ -56,6 +56,9 @@ interface Lead {
   name: string
   email: string | null
   company: string | null
+  profileUrl: string | null
+  postUrl: string | null
+  website: string | null
   status: string
   notes: string | null
   assignedToId: string | null
@@ -776,6 +779,9 @@ export default function DashboardPage() {
             name: editingLead.name,
             email: editingLead.email || '',
             company: editingLead.company || '',
+            profileUrl: editingLead.profileUrl || '',
+            postUrl: editingLead.postUrl || '',
+            website: editingLead.website || '',
             status: editingLead.status,
             notes: editingLead.notes || '',
             assignedToId: editingLead.assignedTo?.id || null,
