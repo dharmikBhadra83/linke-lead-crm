@@ -25,7 +25,7 @@ export const createLeadSchema = z.object({
 })
 
 export const updateLeadSchema = createLeadSchema.partial().extend({
-  status: z.enum(['new', 'requested', 'texted', 'replied', 'meeting_booked', 'first_followup', 'second_followup', 'junk', 'closed']).optional(),
+  status: z.enum(['new', 'requested', 'texted', 'replied', 'meeting_booked', 'first_followup', 'second_followup', 'junk', 'closed', 'commented']).optional(),
   assignedToId: z.string().optional().nullable(),
 })
 
@@ -35,7 +35,7 @@ export const claimLeadSchema = z.object({
 
 export const changeStatusSchema = z.object({
   leadId: z.string().min(1, 'Lead ID is required'),
-  newStatus: z.enum(['new', 'requested', 'texted', 'replied', 'meeting_booked', 'first_followup', 'second_followup', 'junk', 'closed']),
+  newStatus: z.enum(['new', 'requested', 'texted', 'replied', 'meeting_booked', 'first_followup', 'second_followup', 'junk', 'closed', 'commented']),
   reason: z.string().optional(),
 })
 

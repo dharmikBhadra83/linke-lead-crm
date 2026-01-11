@@ -408,7 +408,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen max-h-screen overflow-hidden bg-background">
       <Sidebar user={user} onLogout={handleLogout} isOpen={sidebarOpen} onToggle={setSidebarOpen} />
       
       <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
@@ -447,9 +447,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <Card>
-            <CardContent className="p-6">
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="p-6">
+            <Card>
+              <CardContent className="p-6">
               <div className="space-y-4">
               {/* Filters */}
               <div className="flex gap-4 flex-wrap">
@@ -753,6 +754,7 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       </div>
 

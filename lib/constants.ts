@@ -1,4 +1,4 @@
-export type LeadStatus = 'new' | 'requested' | 'texted' | 'replied' | 'meeting_booked' | 'first_followup' | 'second_followup' | 'junk' | 'closed'
+export type LeadStatus = 'new' | 'requested' | 'texted' | 'replied' | 'meeting_booked' | 'first_followup' | 'second_followup' | 'junk' | 'closed' | 'commented'
 export type UserRole = 'admin' | 'lead_gen' | 'outreach'
 
 export const LEAD_STATUSES: LeadStatus[] = [
@@ -11,6 +11,7 @@ export const LEAD_STATUSES: LeadStatus[] = [
   'second_followup',
   'junk',
   'closed',
+  'commented',
 ]
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
@@ -23,6 +24,7 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   second_followup: 'Second Follow-up',
   junk: 'Junk',
   closed: 'Closed',
+  commented: 'Commented',
 }
 
 export const USER_ROLES: UserRole[] = ['admin', 'lead_gen', 'outreach']

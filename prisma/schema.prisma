@@ -22,6 +22,7 @@ enum LeadStatus {
   second_followup
   junk
   closed
+  commented
 }
 
 model User {

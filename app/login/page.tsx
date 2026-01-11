@@ -89,11 +89,6 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
-          <div className="mt-4 text-xs text-gray-500 text-center">
-            <p>Test credentials:</p>
-            <p>Admin: admin / admin123</p>
-            <p>Outreach: outreach / outreach123</p>
-          </div>
         </CardContent>
       </Card>
     </div>
