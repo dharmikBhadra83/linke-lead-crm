@@ -31,6 +31,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -41,6 +43,7 @@ import {
 } from '@/components/ui/dialog'
 import { LeadFormDialog } from '@/components/LeadFormDialog'
 import { LEAD_STATUS_LABELS, LEAD_STATUSES } from '@/lib/constants'
+import { ChevronDown } from 'lucide-react'
 import {
   Pagination,
   PaginationContent,
@@ -107,6 +110,10 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [filter, setFilter] = useState<string>('all')
+  const [dateFilter, setDateFilter] = useState<string>('')
+  const [appliedDateFilter, setAppliedDateFilter] = useState<string>('')
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
+  const [appliedStatuses, setAppliedStatuses] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
   const [pagination, setPagination] = useState<{
     page: number
@@ -126,6 +133,7 @@ export default function DashboardPage() {
   } | null>(null)
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [popoverOpen, setPopoverOpen] = useState(false)
 
   const checkSession = useCallback(async () => {
     try {
@@ -151,7 +159,22 @@ export default function DashboardPage() {
       params.append('page', page.toString())
       params.append('limit', '15')
 
-      // Use separate APIs for status and action filters
+      // Use date filter API if date filter is applied (separate from other filters)
+      if (appliedDateFilter) {
+        params.append('date', appliedDateFilter)
+        if (appliedStatuses.size > 0) {
+          params.append('statuses', Array.from(appliedStatuses).join(','))
+        }
+        const response = await fetch(`/api/leads/date-filter?${params.toString()}`)
+        const data = await response.json()
+        if (response.ok) {
+          setLeads(data.leads || [])
+          setPagination(data.pagination)
+        }
+        return
+      }
+
+      // Use separate APIs for status and action filters (existing functionality)
       let apiUrl = '/api/leads'
       if (filter && filter !== 'all') {
         // Use action API when action filter is selected
@@ -175,7 +198,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, filter, page])
+  }, [search, statusFilter, filter, appliedDateFilter, appliedStatuses, page])
 
   useEffect(() => {
     checkSession()
@@ -184,27 +207,56 @@ export default function DashboardPage() {
   // Handle filter changes - reset the other filter when one is selected
   useEffect(() => {
     if (user) {
-      // When status filter changes to non-"all", reset action filter
-      if (statusFilter && statusFilter !== 'all') {
+      // When applied date filter is set, reset status and action filters (date filter takes priority)
+      if (appliedDateFilter) {
+        setStatusFilter('all')
         setFilter('all')
       }
+      // When status filter changes to non-"all", reset action filter and applied date filter
+      else if (statusFilter && statusFilter !== 'all') {
+        setFilter('all')
+        setAppliedDateFilter('')
+        setAppliedStatuses(new Set())
+        setDateFilter('')
+        setSelectedStatuses(new Set())
+      }
     }
-  }, [statusFilter, user])
+  }, [statusFilter, appliedDateFilter, user])
 
   useEffect(() => {
     if (user) {
-      // When action filter changes to non-"all", reset status filter
+      // When action filter changes to non-"all", reset status filter and applied date filter
       if (filter && filter !== 'all') {
         setStatusFilter('all')
+        setAppliedDateFilter('')
+        setAppliedStatuses(new Set())
+        setDateFilter('')
+        setSelectedStatuses(new Set())
       }
     }
   }, [filter, user])
+
+  const handleApplyDateFilter = () => {
+    setAppliedDateFilter(dateFilter)
+    setAppliedStatuses(new Set(selectedStatuses))
+    setPopoverOpen(false)
+    setPage(1) // Reset to first page when applying filter
+  }
+
+  const handleClearDateFilter = () => {
+    setDateFilter('')
+    setSelectedStatuses(new Set())
+    setAppliedDateFilter('')
+    setAppliedStatuses(new Set())
+    setPopoverOpen(false)
+    setPage(1) // Reset to first page when clearing filter
+  }
 
   useEffect(() => {
     if (user) {
       fetchLeads()
     }
-  }, [user, search, statusFilter, filter, fetchLeads])
+  }, [user, search, statusFilter, filter, appliedDateFilter, appliedStatuses, fetchLeads])
 
   useEffect(() => {
     if (user) {
@@ -455,7 +507,7 @@ export default function DashboardPage() {
               <CardContent className="p-6">
               <div className="space-y-4">
               {/* Filters */}
-              <div className="flex gap-4 flex-wrap">
+              <div className="flex gap-4 flex-wrap items-center">
                 <Input
                   placeholder="Search by name, email, or company..."
                   value={search}
@@ -487,6 +539,88 @@ export default function DashboardPage() {
                     <SelectItem value="replied_old">4. Replied 6 days ago</SelectItem>
                   </SelectContent>
                 </Select>
+                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-[220px] justify-between text-left font-normal">
+                      <span className="truncate">
+                        {appliedDateFilter ? (
+                          <>
+                            {new Date(appliedDateFilter).toLocaleDateString()}
+                            {appliedStatuses.size > 0 && ` (${appliedStatuses.size} status${appliedStatuses.size > 1 ? 'es' : ''})`}
+                          </>
+                        ) : (
+                          <span>Filter by Date & Status</span>
+                        )}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 ml-2 shrink-0" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-96" align="start">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="date-filter" className="text-sm font-medium">Select Date</Label>
+                        <Input
+                          id="date-filter"
+                          type="date"
+                          value={dateFilter}
+                          onChange={(e) => setDateFilter(e.target.value)}
+                          className="w-full h-10 px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                          style={{
+                            colorScheme: 'dark',
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Select Statuses (Optional)</Label>
+                        <div className="border rounded-md p-3 bg-muted/30">
+                          <div className="grid grid-cols-2 gap-3 max-h-[280px] overflow-y-auto">
+                            {LEAD_STATUSES.map((status) => (
+                              <div key={status} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`status-${status}`}
+                                  checked={selectedStatuses.has(status)}
+                                  onCheckedChange={(checked) => {
+                                    const newStatuses = new Set(selectedStatuses)
+                                    if (checked) {
+                                      newStatuses.add(status)
+                                    } else {
+                                      newStatuses.delete(status)
+                                    }
+                                    setSelectedStatuses(newStatuses)
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`status-${status}`}
+                                  className="text-sm font-normal cursor-pointer flex-1"
+                                >
+                                  {LEAD_STATUS_LABELS[status as keyof typeof LEAD_STATUS_LABELS]}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-2 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleClearDateFilter}
+                          className="flex-1"
+                        >
+                          Clear
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleApplyDateFilter}
+                          className="flex-1"
+                          disabled={!dateFilter}
+                        >
+                          Apply Filter
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Leads Table */}
