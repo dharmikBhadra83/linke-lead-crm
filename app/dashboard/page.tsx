@@ -70,6 +70,8 @@ interface Lead {
   firstFollowupAt: string | null
   secondFollowupAt: string | null
   repliedAt: string | null
+  meetingBookedAt: string | null
+  commentedAt: string | null
   lastStatusUpdater: {
     id: string
     username: string
@@ -499,7 +501,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="border rounded-lg border-border overflow-hidden">
                   <div className="overflow-x-auto w-full">
-                    <Table className="w-full" style={{ minWidth: '1600px' }}>
+                    <Table className="w-full" style={{ minWidth: '1900px' }}>
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Name</TableHead>
@@ -511,6 +513,8 @@ export default function DashboardPage() {
                           <TableHead className="min-w-[150px] whitespace-nowrap font-semibold">First Follow-up</TableHead>
                           <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Second Follow-up</TableHead>
                           <TableHead className="min-w-[130px] whitespace-nowrap font-semibold">Replied</TableHead>
+                          <TableHead className="min-w-[150px] whitespace-nowrap font-semibold">Meeting Booked</TableHead>
+                          <TableHead className="min-w-[150px] whitespace-nowrap font-semibold">Commented</TableHead>
                           <TableHead className="min-w-[150px] whitespace-nowrap font-semibold">Last Updated By</TableHead>
                           <TableHead className="min-w-[120px] whitespace-nowrap font-semibold">Created</TableHead>
                           <TableHead className="min-w-[200px] whitespace-nowrap font-semibold">Actions</TableHead>
@@ -554,56 +558,54 @@ export default function DashboardPage() {
                           </TableCell>
                           <TableCell>
                             {lead.textedAt ? (
-                              <div className="text-sm">
-                                <div className="text-xs text-gray-500">
-                                  {new Date(lead.textedAt).toLocaleDateString()}
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                  {new Date(lead.textedAt).toLocaleTimeString()}
-                                </div>
-                              </div>
+                              <span className="text-sm text-gray-700">
+                                {new Date(lead.textedAt).toLocaleDateString()}
+                              </span>
                             ) : (
                               <span className="text-gray-400 text-sm">-</span>
                             )}
                           </TableCell>
                           <TableCell>
                             {lead.firstFollowupAt ? (
-                              <div className="text-sm">
-                                <div className="text-xs text-gray-500">
-                                  {new Date(lead.firstFollowupAt).toLocaleDateString()}
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                  {new Date(lead.firstFollowupAt).toLocaleTimeString()}
-                                </div>
-                              </div>
+                              <span className="text-sm text-gray-700">
+                                {new Date(lead.firstFollowupAt).toLocaleDateString()}
+                              </span>
                             ) : (
                               <span className="text-gray-400 text-sm">-</span>
                             )}
                           </TableCell>
                           <TableCell>
                             {lead.secondFollowupAt ? (
-                              <div className="text-sm">
-                                <div className="text-xs text-gray-500">
-                                  {new Date(lead.secondFollowupAt).toLocaleDateString()}
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                  {new Date(lead.secondFollowupAt).toLocaleTimeString()}
-                                </div>
-                              </div>
+                              <span className="text-sm text-gray-700">
+                                {new Date(lead.secondFollowupAt).toLocaleDateString()}
+                              </span>
                             ) : (
                               <span className="text-gray-400 text-sm">-</span>
                             )}
                           </TableCell>
                           <TableCell>
                             {lead.repliedAt ? (
-                              <div className="text-sm">
-                                <div className="text-xs text-gray-500">
-                                  {new Date(lead.repliedAt).toLocaleDateString()}
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                  {new Date(lead.repliedAt).toLocaleTimeString()}
-                                </div>
-                              </div>
+                              <span className="text-sm text-gray-700">
+                                {new Date(lead.repliedAt).toLocaleDateString()}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {lead.meetingBookedAt ? (
+                              <span className="text-sm text-gray-700">
+                                {new Date(lead.meetingBookedAt).toLocaleDateString()}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {lead.commentedAt ? (
+                              <span className="text-sm text-gray-700">
+                                {new Date(lead.commentedAt).toLocaleDateString()}
+                              </span>
                             ) : (
                               <span className="text-gray-400 text-sm">-</span>
                             )}

@@ -23,7 +23,7 @@ export async function POST(
     // Check if lead exists
     const lead = await prisma.lead.findUnique({
       where: { id: params.id },
-    })
+    }) as any
 
     if (!lead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
@@ -82,6 +82,10 @@ export async function POST(
       updateData.secondFollowupAt = now
     } else if (validatedData.newStatus === 'replied' && !lead.repliedAt) {
       updateData.repliedAt = now
+    } else if (validatedData.newStatus === 'meeting_booked' && !(lead as any).meetingBookedAt) {
+      updateData.meetingBookedAt = now
+    } else if (validatedData.newStatus === 'commented' && !(lead as any).commentedAt) {
+      updateData.commentedAt = now
     }
 
     // Update lead status

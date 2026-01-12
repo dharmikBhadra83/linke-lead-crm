@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { requireRole } from '@/lib/auth'
 import { createLeadSchema } from '@/lib/validations'
-import { runAutomationRules } from '@/lib/automation'
 
 // GET /api/leads - Get all leads (with role-based filtering)
 export async function GET(request: NextRequest) {
@@ -122,8 +121,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Run automation rules before fetching leads
-    await runAutomationRules()
+    // Note: Automation rules are now handled by cron job at /api/cron/automation
+    // This runs daily at midnight via Vercel Cron (configured in vercel.json)
 
     // Get total count for pagination
     const total = await prisma.lead.count({ where })
@@ -161,12 +160,14 @@ export async function GET(request: NextRequest) {
 
     // Transform leads to include lastStatusUpdater
     // Ensure all date fields are included (even if null)
-    const leadsWithLastUpdater = leads.map((lead: typeof leads[0]) => ({
+    const leadsWithLastUpdater = leads.map((lead: any) => ({
       ...lead,
       textedAt: lead.textedAt || null,
       firstFollowupAt: lead.firstFollowupAt || null,
       secondFollowupAt: lead.secondFollowupAt || null,
       repliedAt: lead.repliedAt || null,
+      meetingBookedAt: (lead as any).meetingBookedAt || null,
+      commentedAt: (lead as any).commentedAt || null,
       lastStatusUpdater: lead.statusHistory[0]?.user || null,
       lastStatusUpdatedAt: lead.statusHistory[0]?.createdAt || null,
     }))

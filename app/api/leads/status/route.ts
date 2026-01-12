@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { runAutomationRules } from '@/lib/automation'
 
 // Force dynamic rendering for this route (uses cookies)
 export const dynamic = 'force-dynamic'
@@ -83,9 +82,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Run automation rules before fetching leads
-    await runAutomationRules()
-
     // Get total count for pagination
     const total = await prisma.lead.count({ where })
 
@@ -121,12 +117,14 @@ export async function GET(request: NextRequest) {
     })
 
     // Transform leads to include lastStatusUpdater
-    const leadsWithLastUpdater = leads.map((lead: typeof leads[0]) => ({
+    const leadsWithLastUpdater = leads.map((lead: any) => ({
       ...lead,
       textedAt: lead.textedAt || null,
       firstFollowupAt: lead.firstFollowupAt || null,
       secondFollowupAt: lead.secondFollowupAt || null,
       repliedAt: lead.repliedAt || null,
+      meetingBookedAt: (lead as any).meetingBookedAt || null,
+      commentedAt: (lead as any).commentedAt || null,
       lastStatusUpdater: lead.statusHistory[0]?.user || null,
       lastStatusUpdatedAt: lead.statusHistory[0]?.createdAt || null,
     }))

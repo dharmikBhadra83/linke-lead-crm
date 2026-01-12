@@ -54,6 +54,8 @@ model Lead {
   firstFollowupAt DateTime?
   secondFollowupAt DateTime?
   repliedAt       DateTime?
+  meetingBookedAt DateTime?
+  commentedAt     DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -68,6 +70,8 @@ model Lead {
   @@index([firstFollowupAt])
   @@index([secondFollowupAt])
   @@index([repliedAt])
+  @@index([meetingBookedAt])
+  @@index([commentedAt])
   @@map("leads")
 }
 
