@@ -42,7 +42,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { LeadFormDialog } from '@/components/LeadFormDialog'
-import { LEAD_STATUS_LABELS, LEAD_STATUSES } from '@/lib/constants'
+import { LEAD_STATUS_LABELS, LEAD_STATUSES, SYSTEMS, SYSTEM_LABELS } from '@/lib/constants'
 import { ChevronDown } from 'lucide-react'
 import {
   Pagination,
@@ -63,6 +63,7 @@ interface Lead {
   postUrl: string | null
   website: string | null
   status: string
+  system: string
   notes: string | null
   assignedToId: string | null
   assignedTo: {
@@ -110,6 +111,7 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [filter, setFilter] = useState<string>('all')
+  const [systemFilter, setSystemFilter] = useState<string>('all')
   const [dateFilter, setDateFilter] = useState<string>('')
   const [appliedDateFilter, setAppliedDateFilter] = useState<string>('')
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
@@ -156,6 +158,7 @@ export default function DashboardPage() {
       setLoading(true)
       const params = new URLSearchParams()
       if (search) params.append('search', search)
+      if (systemFilter && systemFilter !== 'all') params.append('system', systemFilter)
       params.append('page', page.toString())
       params.append('limit', '15')
 
@@ -198,7 +201,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, filter, appliedDateFilter, appliedStatuses, page])
+  }, [search, statusFilter, filter, systemFilter, appliedDateFilter, appliedStatuses, page])
 
   useEffect(() => {
     checkSession()
@@ -537,6 +540,19 @@ export default function DashboardPage() {
                     <SelectItem value="texted_old">2. Texted 4 days ago</SelectItem>
                     <SelectItem value="first_followup_old">3. First Follow-up 4 days ago</SelectItem>
                     <SelectItem value="replied_old">4. Replied 6 days ago</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={systemFilter} onValueChange={setSystemFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="System" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Systems</SelectItem>
+                    {SYSTEMS.map((system) => (
+                      <SelectItem key={system} value={system}>
+                        {SYSTEM_LABELS[system as keyof typeof SYSTEM_LABELS]}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>

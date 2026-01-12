@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const status = searchParams.get('status')
+    const system = searchParams.get('system')
     const search = searchParams.get('search')
     const filter = searchParams.get('filter') // 'unclaimed', 'texted_old', etc.
     const page = parseInt(searchParams.get('page') || '1', 10)
@@ -79,6 +80,11 @@ export async function GET(request: NextRequest) {
     } else if (status && status !== 'all' && session.role !== 'lead_gen') {
       // Apply status filter only if no action filter is set and status is not 'all'
       additionalConditions.push({ status })
+    }
+
+    // Apply system filter
+    if (system && system !== 'all') {
+      additionalConditions.push({ system })
     }
 
     // Apply search filter (PostgreSQL supports case-insensitive search)

@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { LEAD_STATUS_LABELS, LEAD_STATUSES } from '@/lib/constants'
+import { LEAD_STATUS_LABELS, LEAD_STATUSES, SYSTEMS, SYSTEM_LABELS } from '@/lib/constants'
 
 interface LeadFormData {
   name: string
@@ -29,6 +29,7 @@ interface LeadFormData {
   postUrl: string
   website: string
   status: string
+  system: string
   notes: string
   assignedToId?: string | null
 }
@@ -64,6 +65,7 @@ export function LeadFormDialog({
     postUrl: '',
     website: '',
     status: 'new',
+    system: 'linkedin_one',
     notes: '',
     assignedToId: null,
   })
@@ -91,6 +93,7 @@ export function LeadFormDialog({
           postUrl: initialData.postUrl || '',
           website: initialData.website || '',
           status: initialData.status || 'new',
+          system: (initialData as any).system || 'linkedin_one',
           notes: initialData.notes || '',
           assignedToId: initialData.assignedToId || null,
         })
@@ -104,6 +107,7 @@ export function LeadFormDialog({
           postUrl: '',
           website: '',
           status: 'new',
+          system: 'linkedin_one',
           notes: '',
           assignedToId: null,
         })
@@ -268,31 +272,52 @@ export function LeadFormDialog({
                   </SelectContent>
                 </Select>
               </div>
-              {isAdmin && (
-                <div className="space-y-2">
-                  <Label htmlFor="assignedToId">Assigned To</Label>
-                  <Select
-                    value={formData.assignedToId || 'unassigned'}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, assignedToId: value === 'unassigned' ? null : value })
-                    }
-                    disabled={loading || loadingUsers}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Unassigned" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {outreachUsers.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.username}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="system">System</Label>
+                <Select
+                  value={formData.system}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, system: value })
+                  }
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SYSTEMS.map((system) => (
+                      <SelectItem key={system} value={system}>
+                        {SYSTEM_LABELS[system as keyof typeof SYSTEM_LABELS]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+            {isAdmin && (
+              <div className="space-y-2">
+                <Label htmlFor="assignedToId">Assigned To</Label>
+                <Select
+                  value={formData.assignedToId || 'unassigned'}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, assignedToId: value === 'unassigned' ? null : value })
+                  }
+                  disabled={loading || loadingUsers}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {outreachUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>
               <textarea

@@ -1,5 +1,6 @@
 export type LeadStatus = 'new' | 'requested' | 'texted' | 'replied' | 'meeting_booked' | 'first_followup' | 'second_followup' | 'junk' | 'closed' | 'commented'
 export type UserRole = 'admin' | 'lead_gen' | 'outreach'
+export type System = 'linkedin_one' | 'linkedin_two' | 'upwork'
 
 export const LEAD_STATUSES: LeadStatus[] = [
   'new',
@@ -33,6 +34,18 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Admin',
   lead_gen: 'Lead Gen',
   outreach: 'Outreach',
+}
+
+export const SYSTEMS: System[] = [
+  'linkedin_one',
+  'linkedin_two',
+  'upwork',
+]
+
+export const SYSTEM_LABELS: Record<System, string> = {
+  linkedin_one: 'LinkedIn One',
+  linkedin_two: 'LinkedIn Two',
+  upwork: 'Upwork',
 }
 
 // Automation rules

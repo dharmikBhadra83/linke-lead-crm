@@ -21,6 +21,7 @@ export const createLeadSchema = z.object({
   postUrl: z.string().url().optional().or(z.literal('')),
   website: z.string().url().optional().or(z.literal('')),
   notes: z.string().optional(),
+  system: z.enum(['linkedin_one', 'linkedin_two', 'upwork']).optional(),
   assignedToId: z.string().optional().nullable(),
 })
 

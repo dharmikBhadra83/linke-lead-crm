@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const filter = searchParams.get('filter') 
+    const system = searchParams.get('system')
     const search = searchParams.get('search')
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '15', 10)
@@ -88,6 +89,17 @@ export async function GET(request: NextRequest) {
       }
     }
     // Admin sees all leads - no additional restrictions
+
+    // Apply system filter
+    if (system && system !== 'all') {
+      if (where.AND) {
+        where.AND.push({ system })
+      } else {
+        where = {
+          AND: [where, { system }],
+        }
+      }
+    }
 
     // Apply search filter (PostgreSQL supports case-insensitive search)
     if (search) {

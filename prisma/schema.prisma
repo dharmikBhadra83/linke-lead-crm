@@ -25,6 +25,12 @@ enum LeadStatus {
   commented
 }
 
+enum System {
+  linkedin_one
+  linkedin_two
+  upwork
+}
+
 model User {
   id        String   @id @default(cuid())
   username  String   @unique
@@ -48,6 +54,7 @@ model Lead {
   postUrl         String?
   website         String?
   status          LeadStatus @default(new)
+  system          System     @default(linkedin_one)
   assignedToId    String?
   notes           String?
   textedAt        DateTime?
@@ -63,6 +70,7 @@ model Lead {
   statusHistory StatusHistory[]
 
   @@index([status])
+  @@index([system])
   @@index([assignedToId])
   @@index([createdAt])
   @@index([updatedAt])

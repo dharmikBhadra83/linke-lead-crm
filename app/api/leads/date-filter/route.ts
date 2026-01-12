@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const dateParam = searchParams.get('date')
     const statusesParam = searchParams.get('statuses')
+    const system = searchParams.get('system')
     const search = searchParams.get('search')
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '15', 10)
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     if (selectedStatuses.length > 0) {
       // Condition 1: Leads created on that date with selected statuses
-      dateStatusConditions.push({
+      const condition1: any = {
         AND: [
           {
             createdAt: {
@@ -78,10 +79,15 @@ export async function GET(request: NextRequest) {
             },
           },
         ],
-      })
+      }
+      // Add system filter to condition 1 if specified
+      if (system && system !== 'all') {
+        condition1.AND.push({ system })
+      }
+      dateStatusConditions.push(condition1)
 
       // Condition 2: Leads that had status changed to one of selected statuses on that date
-      dateStatusConditions.push({
+      const condition2: any = {
         statusHistory: {
           some: {
             newStatus: {
@@ -93,15 +99,25 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-      })
+      }
+      // Add system filter to condition 2 if specified
+      if (system && system !== 'all') {
+        condition2.system = system
+      }
+      dateStatusConditions.push(condition2)
     } else {
       // No statuses selected - just filter by date
-      dateStatusConditions.push({
+      const dateCondition: any = {
         createdAt: {
           gte: dateStart,
           lte: dateEnd,
         },
-      })
+      }
+      // Add system filter if specified
+      if (system && system !== 'all') {
+        dateCondition.system = system
+      }
+      dateStatusConditions.push(dateCondition)
     }
 
     // Apply search filter
