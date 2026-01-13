@@ -445,7 +445,7 @@ export default function DashboardPage() {
   const canEdit = (lead: Lead) => {
     if (user?.role === 'admin') return true
     if (user?.role === 'lead_gen' && !lead.assignedToId) return true
-    if (user?.role === 'outreach' && lead.assignedToId === user.id) return true
+    if (user?.role === 'outreach' && (!lead.assignedToId || lead.assignedToId === user.id)) return true
     return false
   }
   const canDelete = user?.role === 'admin'
@@ -655,6 +655,9 @@ export default function DashboardPage() {
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Name</TableHead>
+                          <TableHead className="min-w-[120px] whitespace-nowrap font-semibold">Created</TableHead>
+                          <TableHead className="min-w-[180px] whitespace-nowrap font-semibold">profile_url</TableHead>
+                          <TableHead className="min-w-[180px] whitespace-nowrap font-semibold">post_url</TableHead>
                           <TableHead className="min-w-[200px] whitespace-nowrap font-semibold">Email</TableHead>
                           <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Company</TableHead>
                           <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Status</TableHead>
@@ -666,7 +669,6 @@ export default function DashboardPage() {
                           <TableHead className="min-w-[150px] whitespace-nowrap font-semibold">Meeting Booked</TableHead>
                           <TableHead className="min-w-[150px] whitespace-nowrap font-semibold">Commented</TableHead>
                           <TableHead className="min-w-[150px] whitespace-nowrap font-semibold">Last Updated By</TableHead>
-                          <TableHead className="min-w-[120px] whitespace-nowrap font-semibold">Created</TableHead>
                           <TableHead className="min-w-[200px] whitespace-nowrap font-semibold">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -674,6 +676,37 @@ export default function DashboardPage() {
                       {leads.map((lead) => (
                         <TableRow key={lead.id}>
                           <TableCell className="font-medium">{lead.name}</TableCell>
+                          <TableCell>
+                            {new Date(lead.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            {lead.profileUrl ? (
+                              <a
+                                href={lead.profileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 underline text-sm"
+                              >
+                                View Profile
+                              </a>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {lead.postUrl ? (
+                              <a
+                                href={lead.postUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 underline text-sm"
+                              >
+                                View Post
+                              </a>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </TableCell>
                           <TableCell>{lead.email || '-'}</TableCell>
                           <TableCell>{lead.company || '-'}</TableCell>
                           <TableCell>
@@ -773,9 +806,6 @@ export default function DashboardPage() {
                             ) : (
                               <span className="text-gray-400 text-sm">-</span>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            {new Date(lead.createdAt).toLocaleDateString()}
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">

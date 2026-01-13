@@ -1,5 +1,6 @@
 import Papa from 'papaparse'
 import { createLeadSchema } from './validations'
+import { SYSTEMS, System } from './constants'
 
 export interface CSVLeadRow {
   name: string
@@ -8,6 +9,7 @@ export interface CSVLeadRow {
   profileUrl?: string
   postUrl?: string
   website?: string
+  system?: System
 }
 
 export interface CSVParseResult {
@@ -82,6 +84,14 @@ export function parseCSVFromBuffer(csvContent: string | Buffer): CSVParseResult 
       }
     }
     
+    let systemValue: System | undefined = undefined
+    const systemFromCSV = normalizedRow['system']?.toLowerCase().trim()
+    if (systemFromCSV && SYSTEMS.includes(systemFromCSV as System)) {
+      systemValue = systemFromCSV as System
+    } else if (systemFromCSV) {
+      systemValue = undefined
+    }
+
     const leadData: CSVLeadRow = {
       name: name,
       email: normalizedRow['email'] || undefined,
@@ -89,6 +99,7 @@ export function parseCSVFromBuffer(csvContent: string | Buffer): CSVParseResult 
       profileUrl: normalizedRow['profile url'] || normalizedRow['profileurl'] || undefined,
       postUrl: normalizedRow['post url'] || normalizedRow['posturl'] || undefined,
       website: normalizedRow['website'] || undefined,
+      system: systemValue,
     }
 
     // Skip if name is empty (required field)
@@ -170,13 +181,23 @@ export function parseCSV(file: File): Promise<CSVParseResult> {
             }
           }
 
+          // Extract system value and validate it
+          let systemValue: System | undefined = undefined
+          const systemFromCSV = normalizedRow['system']?.toLowerCase().trim()
+          if (systemFromCSV && SYSTEMS.includes(systemFromCSV as System)) {
+            systemValue = systemFromCSV as System
+          } else if (systemFromCSV) {
+            systemValue = undefined
+          }
+
           const leadData: CSVLeadRow = {
             name: name,
             email: normalizedRow['email'] || undefined,
             company: normalizedRow['company name'] || normalizedRow['company'] || undefined,
             profileUrl: normalizedRow['profile url'] || normalizedRow['profileurl'] || undefined,
             postUrl: normalizedRow['post url'] || normalizedRow['posturl'] || undefined,
-            website: normalizedRow['website'] || undefined,
+            website: normalizedRow['website'] || normalizedRow['company url'] || undefined,
+            system: systemValue,
           }
 
           if (!leadData.name || leadData.name.trim() === '') {

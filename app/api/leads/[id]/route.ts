@@ -94,9 +94,9 @@ export async function PUT(
       )
     }
 
-    if (session.role === 'outreach' && existingLead.assignedToId !== session.id) {
+    if (session.role === 'outreach' && existingLead.assignedToId && existingLead.assignedToId !== session.id) {
       return NextResponse.json(
-        { error: 'Can only edit your own leads' },
+        { error: 'Can only edit your own leads or unassigned leads' },
         { status: 403 }
       )
     }
