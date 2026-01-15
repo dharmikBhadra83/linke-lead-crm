@@ -60,7 +60,8 @@ export async function GET(request: NextRequest) {
     // Build date and status filter conditions
     // If statuses are selected, filter leads that:
     // 1. Were created on that date AND have one of the selected statuses, OR
-    // 2. Had their status changed to one of the selected statuses on that date
+    // 2. Had their status changed to one of the selected statuses on that date, OR
+    // 3. Have the date field matching that date for the selected status (e.g., textedAt for 'texted' status)
     const dateStatusConditions: any[] = []
 
     if (selectedStatuses.length > 0) {
@@ -105,6 +106,42 @@ export async function GET(request: NextRequest) {
         condition2.system = system
       }
       dateStatusConditions.push(condition2)
+
+      // Condition 3: Check actual date fields for statuses that have them
+      // Map status to date field
+      const statusDateFieldMap: Record<string, string> = {
+        texted: 'textedAt',
+        replied: 'repliedAt',
+        meeting_booked: 'meetingBookedAt',
+        first_followup: 'firstFollowupAt',
+        second_followup: 'secondFollowupAt',
+        commented: 'commentedAt',
+      }
+
+      // Create conditions for each status that has a date field
+      for (const status of selectedStatuses) {
+        const dateField = statusDateFieldMap[status]
+        if (dateField) {
+          const condition3: any = {
+            AND: [
+              {
+                [dateField]: {
+                  gte: dateStart,
+                  lte: dateEnd,
+                },
+              },
+              {
+                status: status,
+              },
+            ],
+          }
+          // Add system filter if specified
+          if (system && system !== 'all') {
+            condition3.AND.push({ system })
+          }
+          dateStatusConditions.push(condition3)
+        }
+      }
     } else {
       // No statuses selected - just filter by date
       const dateCondition: any = {

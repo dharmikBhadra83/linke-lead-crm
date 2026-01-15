@@ -114,6 +114,13 @@ export function AssignLeadDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          {currentAssignedTo && (
+            <div className="p-3 bg-muted rounded-md">
+              <p className="text-sm font-medium text-foreground">
+                Currently assigned to: <strong>{currentAssignedTo.username}</strong>
+              </p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="assignedTo">Assign To</Label>
             <Select
@@ -133,12 +140,10 @@ export function AssignLeadDialog({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          {currentAssignedTo && (
-            <p className="text-sm text-gray-500">
-              Currently assigned to: <strong>{currentAssignedTo.username}</strong>
+            <p className="text-xs text-muted-foreground">
+              Select "Unassigned" to remove the current assignment
             </p>
-          )}
+          </div>
           {error && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
               {error}

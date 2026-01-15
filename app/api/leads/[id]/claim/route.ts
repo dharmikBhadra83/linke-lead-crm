@@ -35,24 +35,22 @@ export async function POST(
       )
     }
 
-    // Create status history entry first
-    const newStatus = lead.status === 'new' ? 'requested' : lead.status
+    // Create status history entry first (status remains unchanged)
     await prisma.statusHistory.create({
       data: {
         leadId: leadId,
         userId: session.id,
         oldStatus: lead.status,
-        newStatus: newStatus,
+        newStatus: lead.status,
         reason: 'Lead claimed',
       },
     })
 
-    // Update lead
+    // Update lead (only assign, don't change status)
     const updatedLead = await prisma.lead.update({
       where: { id: leadId },
       data: {
         assignedToId: session.id,
-        status: newStatus,
       },
       include: {
         assignedTo: {

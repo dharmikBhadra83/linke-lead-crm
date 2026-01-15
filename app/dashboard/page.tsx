@@ -351,7 +351,7 @@ export default function DashboardPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          assignedToId: selectedUserId,
+          assignedToId: selectedUserId || null,
         }),
       })
 
@@ -838,7 +838,8 @@ export default function DashboardPage() {
                                   </Button>
                                 )}
                               {lead.assignedTo &&
-                                ((user?.role === 'outreach' && lead.assignedToId === user.id) || user?.role === 'admin') && (
+                                ((user?.role === 'outreach' && lead.assignedToId === user.id) || 
+                                 (user?.role === 'admin' && lead.assignedToId === user.id)) && (
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -1007,10 +1008,20 @@ export default function DashboardPage() {
           <DialogHeader>
             <DialogTitle>Assign Lead</DialogTitle>
             <DialogDescription>
-              Select an outreach user to assign this lead to, or leave unassigned.
+              Select an outreach user to assign this lead to, or unassign the lead.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {assigningLeadId && (() => {
+              const lead = leads.find(l => l.id === assigningLeadId)
+              return lead?.assignedTo && (
+                <div className="p-3 bg-muted rounded-md">
+                  <p className="text-sm font-medium text-foreground">
+                    Currently assigned to: <strong>{lead.assignedTo.username}</strong>
+                  </p>
+                </div>
+              )
+            })()}
             <div className="space-y-2">
               <Label htmlFor="assignedTo">Assign To</Label>
               <Select
@@ -1030,15 +1041,8 @@ export default function DashboardPage() {
                   ))}
                 </SelectContent>
               </Select>
+             
             </div>
-            {assigningLeadId && (() => {
-              const lead = leads.find(l => l.id === assigningLeadId)
-              return lead?.assignedTo && (
-                <p className="text-sm text-gray-500">
-                  Currently assigned to: <strong>{lead.assignedTo.username}</strong>
-                </p>
-              )
-            })()}
           </div>
           <DialogFooter>
             <Button
@@ -1052,7 +1056,7 @@ export default function DashboardPage() {
               Cancel
             </Button>
             <Button onClick={handleAssign} disabled={loadingUsers}>
-              Assign
+              {selectedUserId ? 'Assign' : 'Unassign'}
             </Button>
           </DialogFooter>
         </DialogContent>
