@@ -295,6 +295,24 @@ export default function DashboardPage() {
     }
   }
 
+  const handleUnclaim = async (leadId: string) => {
+    try {
+      const response = await fetch(`/api/leads/${leadId}/unclaim`, {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        fetchLeads()
+      } else {
+        const data = await response.json()
+        alert(data.error || 'Failed to unclaim lead')
+      }
+    } catch (error) {
+      console.error('Error unclaiming lead:', error)
+      alert('Failed to unclaim lead')
+    }
+  }
+
   const handleAssignClick = async (leadId: string) => {
     // Find the lead to get current assignment
     const lead = leads.find(l => l.id === leadId)
@@ -817,6 +835,16 @@ export default function DashboardPage() {
                                     onClick={() => handleClaim(lead.id)}
                                   >
                                     Claim
+                                  </Button>
+                                )}
+                              {lead.assignedTo &&
+                                ((user?.role === 'outreach' && lead.assignedToId === user.id) || user?.role === 'admin') && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleUnclaim(lead.id)}
+                                  >
+                                    Unclaim
                                   </Button>
                                 )}
                               {user?.role === 'admin' && (
