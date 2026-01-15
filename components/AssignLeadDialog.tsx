@@ -141,7 +141,7 @@ export function AssignLeadDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Select "Unassigned" to remove the current assignment
+              Select &quot;Unassigned&quot; to remove the current assignment
             </p>
           </div>
           {error && (
