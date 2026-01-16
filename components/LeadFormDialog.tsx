@@ -93,7 +93,7 @@ export function LeadFormDialog({
           postUrl: initialData.postUrl || '',
           website: initialData.website || '',
           status: initialData.status || 'new',
-          system: (initialData as any).system || 'linkedin_one',
+          system: initialData.system || 'linkedin_one',
           notes: initialData.notes || '',
           assignedToId: initialData.assignedToId || null,
         })

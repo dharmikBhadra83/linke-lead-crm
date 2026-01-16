@@ -996,6 +996,7 @@ export default function DashboardPage() {
             postUrl: editingLead.postUrl || '',
             website: editingLead.website || '',
             status: editingLead.status,
+            system: editingLead.system,
             notes: editingLead.notes || '',
             assignedToId: editingLead.assignedTo?.id || null,
           }}
