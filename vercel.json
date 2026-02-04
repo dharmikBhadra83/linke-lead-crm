@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/automation",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/tasks-backlog",
+      "schedule": "0 0 * * *"
     }
   ]
 }

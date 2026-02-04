@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "import:leads": "tsx scripts/import-leads.ts",
-    "test:cron": "tsx scripts/test-cron.ts"
+    "test:cron": "tsx scripts/test-cron.ts",
+    "update:system": "tsx scripts/update-leads-system.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
