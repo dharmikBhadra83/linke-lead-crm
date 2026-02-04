@@ -31,6 +31,12 @@ enum System {
   upwork
 }
 
+enum TaskStatus {
+  undone
+  done
+  backlog
+}
+
 model User {
   id        String   @id @default(cuid())
   username  String   @unique
@@ -41,6 +47,8 @@ model User {
 
   assignedLeads Lead[] @relation("AssignedLeads")
   statusHistory StatusHistory[]
+  assignedTasks  Task[]  @relation("AssignedTasks")
+  createdTasks   Task[]  @relation("CreatedTasks")
 
   @@map("users")
 }
@@ -99,4 +107,27 @@ model StatusHistory {
   @@index([userId])
   @@index([createdAt])
   @@map("status_history")
+}
+
+model Task {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  assignedToId  String
+  createdById   String
+  dueAt         DateTime
+  completedAt   DateTime?
+  status        TaskStatus  @default(undone)
+  createdAt     DateTime   @default(now())
+
+  assignedTo User @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: Cascade)
+  createdBy  User @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([dueAt])
+  @@index([completedAt])
+  @@index([createdAt])
+  @@index([status])
+  @@map("tasks")
 }

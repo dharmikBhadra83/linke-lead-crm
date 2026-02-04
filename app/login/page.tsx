@@ -36,8 +36,7 @@ export default function LoginPage() {
         return
       }
 
-      // Redirect to performance dashboard
-      router.push('/dashboard/performance')
+      router.push('/dashboard/tasks')
       router.refresh()
     } catch (err) {
       setError('An error occurred. Please try again.')

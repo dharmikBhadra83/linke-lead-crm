@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { LayoutDashboard, BarChart3, LogOut, X, Menu } from 'lucide-react'
+import { LayoutDashboard, BarChart3, LogOut, X, Menu, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -32,7 +32,14 @@ export function Sidebar({ user, onLogout, isOpen: controlledIsOpen, onToggle }: 
     }
   }
 
+  const tasksLabel = user?.role === 'admin' ? 'Add Task' : 'MY TASK'
   const menuItems = [
+    {
+      label: tasksLabel,
+      icon: ClipboardList,
+      path: '/dashboard/tasks',
+      active: pathname === '/dashboard/tasks',
+    },
     {
       label: 'Dashboard',
       icon: BarChart3,
