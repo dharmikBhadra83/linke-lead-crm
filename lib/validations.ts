@@ -40,14 +40,22 @@ export const changeStatusSchema = z.object({
   reason: z.string().optional(),
 })
 
-// Task validations
 export const createTaskSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   assignedToId: z.string().min(1, 'Assign to a user'),
+  createdAt: z.string().optional(),
+  dueAt: z.string().optional(),
 })
 
 export const completeTaskSchema = z.object({
   completed: z.literal(true),
 })
 
+export const updateTaskSchema = z.object({
+  title: z.string().min(1, 'Title is required').optional(),
+  description: z.string().optional().nullable(),
+  assignedToId: z.string().min(1, 'Assign to a user').optional(),
+  createdAt: z.string().optional(),
+  dueAt: z.string().optional(),
+})

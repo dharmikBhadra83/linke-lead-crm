@@ -148,8 +148,45 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { title, description, assignedToId } = parsed.data
-    const dueAt = DateTime.utc().plus({ hours: 24 }).toJSDate()
+    const { title, description, assignedToId, createdAt: createdAtStr, dueAt: dueAtStr } = parsed.data
+    const now = DateTime.utc()
+    let createdAt = now.toJSDate()
+    let dueAt = now.plus({ hours: 24 }).toJSDate()
+
+    function parseTaskTimestamp(str: string): Date | null {
+      if (!str?.trim()) return null
+      const s = str.trim()
+      if (s.includes('T')) {
+        const dt = s.endsWith('Z') ? DateTime.fromISO(s, { zone: 'utc' }) : DateTime.fromISO(s, { setZone: true })
+        if (dt.isValid) return dt.toUTC().toJSDate()
+        return null
+      }
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+      if (match) {
+        const [, y, m, d] = match
+        const now = DateTime.utc()
+        const dt = DateTime.utc(parseInt(y!, 10), parseInt(m!, 10), parseInt(d!, 10), now.hour, now.minute, now.second)
+        if (dt.isValid) return dt.toJSDate()
+      }
+      return null
+    }
+
+    if (createdAtStr || dueAtStr) {
+      if (createdAtStr) {
+        const parsedCreated = parseTaskTimestamp(createdAtStr)
+        if (parsedCreated) createdAt = parsedCreated
+      }
+      if (dueAtStr) {
+        const parsedDue = parseTaskTimestamp(dueAtStr)
+        if (parsedDue) dueAt = parsedDue
+      }
+      if (new Date(dueAt).getTime() < new Date(createdAt).getTime()) {
+        return NextResponse.json(
+          { error: 'Due date must be on or after created date' },
+          { status: 400 }
+        )
+      }
+    }
 
     const task = await prisma.task.create({
       data: {
@@ -157,6 +194,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         assignedToId,
         createdById: session.id,
+        createdAt,
         dueAt,
         status: 'undone',
       },

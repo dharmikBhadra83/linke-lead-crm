@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/dialog'
 import { USER_ROLE_LABELS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
-import { ClipboardList, CheckCircle2, ListTodo, CircleCheck, Plus } from 'lucide-react'
+import { ClipboardList, CheckCircle2, ListTodo, CircleCheck, Plus, Trash2, Pencil, AlertTriangle } from 'lucide-react'
 import {
   Pagination,
   PaginationContent,
@@ -86,8 +86,18 @@ export default function TasksPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [assignedToId, setAssignedToId] = useState('')
+  const [createdDate, setCreatedDate] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  const getDefaultCreateDueDates = useCallback(() => {
+    const now = new Date()
+    const in24 = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+    const toLocalDateStr = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return { created: toLocalDateStr(now), due: toLocalDateStr(in24) }
+  }, [])
 
   // Filters (used for both admin and non-admin)
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -96,6 +106,17 @@ export default function TasksPage() {
   const [createdAtTo, setCreatedAtTo] = useState('')
   const [page, setPage] = useState(1)
   const [completingId, setCompletingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editAssignedToId, setEditAssignedToId] = useState('')
+  const [editCreatedDate, setEditCreatedDate] = useState('')
+  const [editDueDate, setEditDueDate] = useState('')
+  const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editError, setEditError] = useState('')
 
   const checkSession = useCallback(async () => {
     try {
@@ -186,16 +207,30 @@ export default function TasksPage() {
       setError('Title and assignee are required.')
       return
     }
+    if (dueDate && createdDate && dueDate < createdDate) {
+      setError('Due date must be on or after created date.')
+      return
+    }
+    const defaults = getDefaultCreateDueDates()
+    const usingDefaultDates = createdDate === defaults.created && dueDate === defaults.due
+    // Send current date + live current time (browser UTC) – never 05:30
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const utcTime = `${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())}`
+    const dateWithCurrentTime = (dateStr: string) => `${dateStr}T${utcTime}.000Z`
     setSubmitting(true)
     try {
+      const payload: Record<string, unknown> = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        assignedToId,
+        createdAt: usingDefaultDates ? now.toISOString() : dateWithCurrentTime(createdDate),
+        dueAt: usingDefaultDates ? new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString() : dateWithCurrentTime(dueDate),
+      }
       const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || undefined,
-          assignedToId,
-        }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -206,6 +241,9 @@ export default function TasksPage() {
       setTitle('')
       setDescription('')
       setAssignedToId('')
+      const { created, due } = getDefaultCreateDueDates()
+      setCreatedDate(created)
+      setDueDate(due)
       setAddTaskOpen(false)
       fetchTasks(page)
     } catch {
@@ -232,21 +270,111 @@ export default function TasksPage() {
     }
   }
 
-  const formatDue = (dueAt: string) => {
-    const d = new Date(dueAt)
-    return d.toLocaleString(undefined, {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    })
+  const openDeleteModal = (task: Task) => {
+    setTaskToDelete(task)
+    setDeleteError('')
   }
 
-  const formatDateOnly = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
+  const confirmDeleteTask = async () => {
+    if (!taskToDelete) return
+    setDeletingId(taskToDelete.id)
+    setDeleteError('')
+    try {
+      const res = await fetch(`/api/tasks/${taskToDelete.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setTaskToDelete(null)
+        fetchTasks(page)
+      } else {
+        const data = await res.json()
+        setDeleteError(data.error || 'Failed to delete task')
+      }
+    } catch {
+      setDeleteError('Failed to delete task')
+    } finally {
+      setDeletingId(null)
+    }
   }
+
+  const openEditModal = (task: Task) => {
+    setEditingTask(task)
+    setEditTitle(task.title)
+    setEditDescription(task.description ?? '')
+    setEditAssignedToId(task.assignedTo?.id ?? '')
+    setEditCreatedDate(new Date(task.createdAt).toISOString().slice(0, 10))
+    setEditDueDate(new Date(task.dueAt).toISOString().slice(0, 10))
+    setEditError('')
+  }
+
+  const handleUpdateTask = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingTask) return
+    setEditError('')
+    if (!editTitle.trim()) {
+      setEditError('Title is required.')
+      return
+    }
+    if (editDueDate && editCreatedDate && editDueDate < editCreatedDate) {
+      setEditError('Due date must be on or after created date.')
+      return
+    }
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const utcTime = `${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())}`
+    const dateWithCurrentTime = (dateStr: string) =>
+      dateStr ? `${dateStr}T${utcTime}.000Z` : undefined
+    setEditSubmitting(true)
+    try {
+      const res = await fetch(`/api/tasks/${editingTask.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDescription.trim() || null,
+          assignedToId: editAssignedToId || undefined,
+          createdAt: dateWithCurrentTime(editCreatedDate),
+          dueAt: dateWithCurrentTime(editDueDate),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setEditError(data.error || 'Failed to update task')
+        setEditSubmitting(false)
+        return
+      }
+      setEditingTask(null)
+      fetchTasks(page)
+    } catch {
+      setEditError('Something went wrong')
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
+  const DISPLAY_TIMEZONE = 'Asia/Kolkata'
+  const formatDateTime = (dateStr: string) => {
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return dateStr
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: DISPLAY_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    const parts = formatter.formatToParts(d)
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
+    const y = get('year')
+    const m = get('month')
+    const day = get('day')
+    const h = get('hour')
+    const min = get('minute')
+    return `${y}-${m}-${day} ${h}:${min}`
+  }
+
+  const formatDue = (dueAt: string) => formatDateTime(dueAt)
+  const formatDateOnly = (dateStr: string) => formatDateTime(dateStr)
 
   const clearFilters = () => {
     setDueDateTo('')
@@ -290,12 +418,22 @@ export default function TasksPage() {
       </header>
 
       {/* Create task modal (admin) */}
-      <Dialog open={addTaskOpen} onOpenChange={setAddTaskOpen}>
+      <Dialog
+        open={addTaskOpen}
+        onOpenChange={(open) => {
+          setAddTaskOpen(open)
+          if (open) {
+            const { created, due } = getDefaultCreateDueDates()
+            setCreatedDate(created)
+            setDueDate(due)
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Create new task</DialogTitle>
             <DialogDescription>
-              Assign a task to an outreach or lead gen user. Task lasts 24 hours; incomplete tasks go to backlog.
+              Assign a task. Created and due dates are required; due date must be on or after created date. Default is today and 24 hours from now. Incomplete tasks go to backlog.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddTask} className="space-y-4">
@@ -335,6 +473,35 @@ export default function TasksPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="task-created">Created date</Label>
+                <Input
+                  id="task-created"
+                  type="date"
+                  value={createdDate}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setCreatedDate(v)
+                    if (dueDate && v && dueDate < v) setDueDate(v)
+                  }}
+                  disabled={submitting}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="task-due">Due date</Label>
+                <Input
+                  id="task-due"
+                  type="date"
+                  value={dueDate}
+                  min={createdDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  disabled={submitting}
+                  required
+                />
+              </div>
+            </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAddTaskOpen(false)} disabled={submitting}>
@@ -345,6 +512,135 @@ export default function TasksPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit task modal (admin) */}
+      <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit task</DialogTitle>
+            <DialogDescription>
+              Update title, description, assignee, or dates. Due date must be on or after created date.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateTask} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-task-title">Title</Label>
+              <Input
+                id="edit-task-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Task title"
+                required
+                disabled={editSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-task-desc">Description (optional)</Label>
+              <Input
+                id="edit-task-desc"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Description"
+                disabled={editSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Assign to</Label>
+              <Select value={editAssignedToId} onValueChange={setEditAssignedToId} disabled={editSubmitting}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignableUsers.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.username} ({USER_ROLE_LABELS[u.role as keyof typeof USER_ROLE_LABELS] ?? u.role})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-task-created">Created date</Label>
+                <Input
+                  id="edit-task-created"
+                  type="date"
+                  value={editCreatedDate}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setEditCreatedDate(v)
+                    if (editDueDate && v && editDueDate < v) setEditDueDate(v)
+                  }}
+                  disabled={editSubmitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-task-due">Due date</Label>
+                <Input
+                  id="edit-task-due"
+                  type="date"
+                  value={editDueDate}
+                  min={editCreatedDate}
+                  onChange={(e) => setEditDueDate(e.target.value)}
+                  disabled={editSubmitting}
+                />
+              </div>
+            </div>
+            {editError && <p className="text-sm text-destructive">{editError}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingTask(null)} disabled={editSubmitting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={editSubmitting}>
+                {editSubmitting ? 'Saving...' : 'Save changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete task confirmation modal (admin) */}
+      <Dialog open={!!taskToDelete} onOpenChange={(open) => !open && setTaskToDelete(null)}>
+        <DialogContent className="sm:max-w-md">
+          <div className="flex flex-col items-center gap-4 py-2">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle className="h-7 w-7 text-destructive" />
+            </div>
+            <div className="space-y-2 text-center">
+              <DialogTitle className="text-lg">Delete task?</DialogTitle>
+              <DialogDescription asChild>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">&quot;{taskToDelete?.title}&quot;</span>
+                  {' '}will be permanently removed. This action cannot be undone.
+                </p>
+              </DialogDescription>
+            </div>
+            {deleteError && (
+              <p className="text-sm text-destructive">{deleteError}</p>
+            )}
+            <div className="flex w-full gap-5 pt-2 justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 sm:flex-none"
+                onClick={() => setTaskToDelete(null)}
+                disabled={!!deletingId}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="flex-1 sm:flex-none"
+                onClick={confirmDeleteTask}
+                disabled={!!deletingId}
+              >
+                {deletingId ? 'Deleting...' : 'Delete task'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -443,6 +739,7 @@ export default function TasksPage() {
                           <TableHead>Due</TableHead>
                           <TableHead>Created</TableHead>
                           <TableHead>Status</TableHead>
+                          {isAdmin && <TableHead className="w-[100px]">Actions</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -483,6 +780,31 @@ export default function TasksPage() {
                                 return <span className="text-muted-foreground">Undone</span>
                               })()}
                             </TableCell>
+                            {isAdmin && (
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => openEditModal(t)}
+                                    title="Edit task"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => openDeleteModal(t)}
+                                    disabled={deletingId === t.id}
+                                    title="Delete task"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            )}
                           </TableRow>
                         ))}
                       </TableBody>
