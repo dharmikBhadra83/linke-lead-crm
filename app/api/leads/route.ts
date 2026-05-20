@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const system = searchParams.get('system')
     const search = searchParams.get('search')
+    const assignedToId = searchParams.get('assignedToId')
     const filter = searchParams.get('filter') // 'unclaimed', 'texted_old', etc.
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '15', 10)
@@ -85,6 +86,11 @@ export async function GET(request: NextRequest) {
     // Apply system filter
     if (system && system !== 'all') {
       additionalConditions.push({ system })
+    }
+
+    // Admin: filter by assigned employee
+    if (session.role === 'admin' && assignedToId) {
+      additionalConditions.push({ assignedToId })
     }
 
     // Apply search filter (PostgreSQL supports case-insensitive search)

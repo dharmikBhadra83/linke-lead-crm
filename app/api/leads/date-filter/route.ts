@@ -19,52 +19,56 @@ export async function GET(request: NextRequest) {
     const statusesParam = searchParams.get('statuses')
     const system = searchParams.get('system')
     const search = searchParams.get('search')
+    const assignedToId = searchParams.get('assignedToId')
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '15', 10)
     const skip = (page - 1) * limit
 
-    if (!dateParam) {
-      return NextResponse.json({ error: 'Date parameter is required' }, { status: 400 })
-    }
-
-    // Parse the date
-    const filterDate = DateTime.fromISO(dateParam, { zone: 'utc' }).startOf('day')
-    if (!filterDate.isValid) {
-      return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
-    }
-
-    const dateStart = filterDate.toJSDate()
-    const dateEnd = filterDate.endOf('day').toJSDate()
-
-    // Parse statuses
     const selectedStatuses = statusesParam ? statusesParam.split(',').filter(Boolean) : []
+
+    if (!dateParam && selectedStatuses.length === 0) {
+      return NextResponse.json(
+        { error: 'Provide a date and/or at least one status' },
+        { status: 400 }
+      )
+    }
+
+    let dateStart: Date | null = null
+    let dateEnd: Date | null = null
+    if (dateParam) {
+      const filterDate = DateTime.fromISO(dateParam, { zone: 'utc' }).startOf('day')
+      if (!filterDate.isValid) {
+        return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
+      }
+      dateStart = filterDate.toJSDate()
+      dateEnd = filterDate.endOf('day').toJSDate()
+    }
 
     // Build where clause based on role
     let where: any = {}
 
     if (session.role === 'admin') {
-      // Admin sees all leads - no role restrictions
       where = {}
     } else if (session.role === 'lead_gen') {
-      // Lead gen only sees unclaimed leads with status 'new'
       where.assignedToId = null
       where.status = 'new'
     } else if (session.role === 'outreach') {
-      // Outreach sees ONLY unclaimed + assigned to them
       where.OR = [
         { assignedToId: null },
         { assignedToId: session.id },
       ]
     }
 
-    // Build date and status filter conditions
-    // If statuses are selected, filter leads that:
-    // 1. Were created on that date AND have one of the selected statuses, OR
-    // 2. Had their status changed to one of the selected statuses on that date, OR
-    // 3. Have the date field matching that date for the selected status (e.g., textedAt for 'texted' status)
     const dateStatusConditions: any[] = []
 
-    if (selectedStatuses.length > 0) {
+    // No date: filter by status only across all dates
+    if (!dateStart || !dateEnd) {
+      if (selectedStatuses.length > 0) {
+        const statusOnly: any = { status: { in: selectedStatuses } }
+        if (system && system !== 'all') statusOnly.system = system
+        dateStatusConditions.push(statusOnly)
+      }
+    } else if (selectedStatuses.length > 0) {
       // Condition 1: Leads created on that date with selected statuses
       const condition1: any = {
         AND: [
@@ -142,15 +146,14 @@ export async function GET(request: NextRequest) {
           dateStatusConditions.push(condition3)
         }
       }
-    } else {
-      // No statuses selected - just filter by date
+    } else if (dateStart && dateEnd) {
+      // Date only, no statuses - leads created on that date
       const dateCondition: any = {
         createdAt: {
           gte: dateStart,
           lte: dateEnd,
         },
       }
-      // Add system filter if specified
       if (system && system !== 'all') {
         dateCondition.system = system
       }
@@ -201,6 +204,18 @@ export async function GET(request: NextRequest) {
             { OR: dateStatusConditions },
           ],
         }
+      }
+    }
+
+    // Admin: filter by assigned employee
+    if (session.role === 'admin' && assignedToId) {
+      const employeeCondition = { assignedToId }
+      if (where.AND) {
+        where.AND.push(employeeCondition)
+      } else if (Object.keys(where).length > 0) {
+        where = { AND: [where, employeeCondition] }
+      } else {
+        where = employeeCondition
       }
     }
 

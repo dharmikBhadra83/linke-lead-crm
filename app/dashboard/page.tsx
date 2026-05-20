@@ -42,7 +42,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { LeadFormDialog } from '@/components/LeadFormDialog'
-import { LEAD_STATUS_LABELS, LEAD_STATUSES, SYSTEMS, SYSTEM_LABELS } from '@/lib/constants'
+import { LEAD_STATUS_LABELS, LEAD_STATUSES, SYSTEMS, SYSTEM_LABELS, USER_ROLE_LABELS } from '@/lib/constants'
 import { ChevronDown } from 'lucide-react'
 import {
   Pagination,
@@ -127,6 +127,8 @@ export default function DashboardPage() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [assigningLeadId, setAssigningLeadId] = useState<string | null>(null)
   const [outreachUsers, setOutreachUsers] = useState<User[]>([])
+  const [employees, setEmployees] = useState<User[]>([])
+  const [employeeFilter, setEmployeeFilter] = useState<string>('all')
   const [selectedUserId, setSelectedUserId] = useState<string>('')
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [viewingHistory, setViewingHistory] = useState<{
@@ -159,12 +161,15 @@ export default function DashboardPage() {
       const params = new URLSearchParams()
       if (search) params.append('search', search)
       if (systemFilter && systemFilter !== 'all') params.append('system', systemFilter)
+      if (user?.role === 'admin' && employeeFilter && employeeFilter !== 'all') {
+        params.append('assignedToId', employeeFilter)
+      }
       params.append('page', page.toString())
       params.append('limit', '15')
 
-      // Use date filter API if date filter is applied (separate from other filters)
-      if (appliedDateFilter) {
-        params.append('date', appliedDateFilter)
+      // Date/status filter: date optional (all dates when omitted), statuses optional
+      if (appliedDateFilter || appliedStatuses.size > 0) {
+        if (appliedDateFilter) params.append('date', appliedDateFilter)
         if (appliedStatuses.size > 0) {
           params.append('statuses', Array.from(appliedStatuses).join(','))
         }
@@ -201,17 +206,38 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, filter, systemFilter, appliedDateFilter, appliedStatuses, page])
+  }, [search, statusFilter, filter, systemFilter, appliedDateFilter, appliedStatuses, employeeFilter, user?.role, page])
 
   useEffect(() => {
     checkSession()
   }, [checkSession])
 
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const response = await fetch('/api/users')
+      const data = await response.json()
+      if (response.ok) {
+        const list = (data.users || []).filter(
+          (u: User) => u.role === 'outreach' || u.role === 'lead_gen'
+        )
+        setEmployees(list)
+      }
+    } catch (error) {
+      console.error('Error fetching employees:', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetchEmployees()
+    }
+  }, [user, fetchEmployees])
+
   // Handle filter changes - reset the other filter when one is selected
   useEffect(() => {
     if (user) {
-      // When applied date filter is set, reset status and action filters (date filter takes priority)
-      if (appliedDateFilter) {
+      // When date/status filter is active, reset status and action filters
+      if (appliedDateFilter || appliedStatuses.size > 0) {
         setStatusFilter('all')
         setFilter('all')
       }
@@ -259,7 +285,7 @@ export default function DashboardPage() {
     if (user) {
       fetchLeads()
     }
-  }, [user, search, statusFilter, filter, appliedDateFilter, appliedStatuses, fetchLeads])
+  }, [user, search, statusFilter, filter, employeeFilter, appliedDateFilter, appliedStatuses, fetchLeads])
 
   useEffect(() => {
     if (user) {
@@ -573,14 +599,39 @@ export default function DashboardPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {user?.role === 'admin' && (
+                  <Select
+                    value={employeeFilter}
+                    onValueChange={(v) => {
+                      setEmployeeFilter(v)
+                      setPage(1)
+                    }}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Employee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Employees</SelectItem>
+                      {employees.map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.username} (
+                          {USER_ROLE_LABELS[emp.role as keyof typeof USER_ROLE_LABELS] ?? emp.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-[220px] justify-between text-left font-normal">
                       <span className="truncate">
-                        {appliedDateFilter ? (
+                        {appliedDateFilter || appliedStatuses.size > 0 ? (
                           <>
-                            {new Date(appliedDateFilter).toLocaleDateString()}
-                            {appliedStatuses.size > 0 && ` (${appliedStatuses.size} status${appliedStatuses.size > 1 ? 'es' : ''})`}
+                            {appliedDateFilter
+                              ? new Date(appliedDateFilter).toLocaleDateString()
+                              : 'All dates'}
+                            {appliedStatuses.size > 0 &&
+                              ` (${appliedStatuses.size} status${appliedStatuses.size > 1 ? 'es' : ''})`}
                           </>
                         ) : (
                           <span>Filter by Date & Status</span>
@@ -592,7 +643,7 @@ export default function DashboardPage() {
                   <PopoverContent className="w-96" align="start">
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="date-filter" className="text-sm font-medium">Select Date</Label>
+                        <Label htmlFor="date-filter" className="text-sm font-medium">Select Date (optional)</Label>
                         <Input
                           id="date-filter"
                           type="date"
@@ -647,7 +698,7 @@ export default function DashboardPage() {
                           size="sm"
                           onClick={handleApplyDateFilter}
                           className="flex-1"
-                          disabled={!dateFilter}
+                          disabled={!dateFilter && selectedStatuses.size === 0}
                         >
                           Apply Filter
                         </Button>
