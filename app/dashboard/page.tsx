@@ -218,7 +218,8 @@ export default function DashboardPage() {
       const data = await response.json()
       if (response.ok) {
         const list = (data.users || []).filter(
-          (u: User) => u.role === 'outreach' || u.role === 'lead_gen'
+          (u: User) =>
+            u.role === 'outreach' || u.role === 'lead_gen' || u.role === 'admin'
         )
         setEmployees(list)
       }
