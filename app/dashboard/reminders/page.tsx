@@ -152,7 +152,7 @@ export default function RemindersPage() {
   }
 
   const renderTable = (rows: Reminder[], highlight?: boolean) => (
-    <Table>
+    <Table className="w-full">
       <TableHeader>
         <TableRow>
           <TableHead>Lead</TableHead>
@@ -178,7 +178,7 @@ export default function RemindersPage() {
             >
               <TableCell className="font-medium">{r.lead.name}</TableCell>
               <TableCell>{formatRemindAtDisplay(r.remindAt)}</TableCell>
-              <TableCell className="max-w-[200px] truncate">{r.note || '—'}</TableCell>
+              <TableCell className="max-w-xs truncate sm:max-w-md">{r.note || '—'}</TableCell>
               <TableCell>
                 {LEAD_STATUS_LABELS[r.lead.status as keyof typeof LEAD_STATUS_LABELS] ?? r.lead.status}
               </TableCell>
@@ -218,61 +218,60 @@ export default function RemindersPage() {
   )
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex h-screen max-h-screen overflow-hidden bg-background">
       <Sidebar user={user} onLogout={() => router.push('/login')} isOpen={sidebarOpen} onToggle={setSidebarOpen} />
-      <header
-        className={cn(
-          'flex items-center justify-between border-b border-border bg-card py-3 shrink-0',
-          sidebarOpen ? 'px-6' : 'pl-20 pr-6'
-        )}
-      >
-        <h1 className="text-xl font-semibold flex items-center gap-2">
-          <Bell className="h-5 w-5" />
-          Reminders
-        </h1>
-        <ThemeToggle />
-      </header>
 
-      <main className={cn('flex-1 overflow-auto p-4', sidebarOpen && 'md:pl-[calc(16rem+1rem)]')}>
-        <div className="space-y-6 max-w-5xl">
-          <p className="text-sm text-muted-foreground">
-            Due today and overdue reminders appear first. Set reminders from the Leads page on any
-            lead you own. Email is sent when the reminder is due and the lead is still assigned to you
-            (add your email on your user record).
-          </p>
+      <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
+        <div
+          className={cn(
+            'border-b border-border bg-card py-4 flex justify-between items-center gap-4 shrink-0 transition-all duration-300',
+            sidebarOpen ? 'px-6' : 'pl-20 pr-6'
+          )}
+        >
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2 truncate">
+              <Bell className="h-6 w-6 shrink-0" />
+              Reminders
+            </h1>
+          </div>
+          <ThemeToggle />
+        </div>
 
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <Spinner className="h-8 w-8" />
-            </div>
-          ) : reminders.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                No reminders yet. Open Leads, claim a lead, and use &quot;Reminder&quot; to schedule a follow-up.
-              </CardContent>
-            </Card>
-          ) : (
-            <>
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="p-6 space-y-6 w-full">
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <Spinner className="h-8 w-8" />
+              </div>
+            ) : reminders.length === 0 ? (
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg text-amber-600 dark:text-amber-400">
-                    Due today & overdue ({due.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="overflow-x-auto">{renderTable(due, true)}</CardContent>
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  No reminders yet. Open Leads, claim a lead, and use &quot;Reminder&quot; to schedule a follow-up.
+                </CardContent>
               </Card>
-              {upcoming.length > 0 && (
+            ) : (
+              <>
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Upcoming ({upcoming.length})</CardTitle>
+                    <CardTitle className="text-lg text-amber-600 dark:text-amber-400">
+                      Due today & overdue ({due.length})
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="overflow-x-auto">{renderTable(upcoming)}</CardContent>
+                  <CardContent className="p-6 pt-0 overflow-x-auto">{renderTable(due, true)}</CardContent>
                 </Card>
-              )}
-            </>
-          )}
+                {upcoming.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Upcoming ({upcoming.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6 pt-0 overflow-x-auto">{renderTable(upcoming)}</CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </div>
         </div>
-      </main>
+      </div>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="sm:max-w-lg">

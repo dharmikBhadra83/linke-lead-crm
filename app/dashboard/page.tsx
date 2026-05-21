@@ -753,7 +753,7 @@ export default function DashboardPage() {
                     <Table className="w-full" style={{ minWidth: '1900px' }}>
                       <TableHeader>
                         <TableRow className="bg-muted/50">
-                          <TableHead className="w-12 min-w-[48px] font-semibold text-center">
+                          <TableHead className="min-w-[130px] whitespace-nowrap font-semibold text-center">
                             Out of location
                           </TableHead>
                           <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Name</TableHead>
@@ -783,7 +783,7 @@ export default function DashboardPage() {
                               'bg-red-50 dark:bg-red-950/25'
                           )}
                         >
-                          <TableCell className="text-center align-middle">
+                          <TableCell className="text-center align-middle w-[130px] min-w-[130px]">
                             <Checkbox
                               checked={lead.outOfLocation}
                               onCheckedChange={(checked) =>
