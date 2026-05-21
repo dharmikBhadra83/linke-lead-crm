@@ -1,7 +1,7 @@
 import { prisma } from './prisma'
 import { sendReminderEmailById } from './reminder-email-job'
 
-/** Manual catch-up for missed emails (Agenda is primary). */
+/** Manual catch-up for missed emails (Inngest is primary). */
 export async function processDueReminderEmails(): Promise<number> {
   const now = new Date()
 

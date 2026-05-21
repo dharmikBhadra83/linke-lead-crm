@@ -6,6 +6,8 @@ import {
   endOfTodayInReminderZoneUtc,
   parseRemindAtFromClient,
 } from '@/lib/reminder-datetime'
+import { scheduleReminderEmailJob } from '@/lib/reminder-scheduler'
+
 export const dynamic = 'force-dynamic'
 
 // GET /api/reminders — list reminders (due today / overdue first)
@@ -117,6 +119,12 @@ export async function POST(request: NextRequest) {
         user: { select: { id: true, username: true } },
       },
     })
+
+    try {
+      await scheduleReminderEmailJob(reminder.id, remindAt)
+    } catch (e) {
+      console.error('[Reminders] Inngest schedule failed:', e)
+    }
 
     return NextResponse.json({ reminder })
   } catch (error) {

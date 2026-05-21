@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-/** Runs every minute via Vercel cron — sends emails for due reminders. */
+/** Optional manual catch-up — primary delivery is Inngest at remindAt (see docs/INNGEST_SETUP.md). */
 export async function GET(request: NextRequest) {
   try {
     const cronHeader = request.headers.get('x-vercel-cron')

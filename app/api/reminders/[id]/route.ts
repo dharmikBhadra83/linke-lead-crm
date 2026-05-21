@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { updateLeadReminderSchema } from '@/lib/validations'
 import { parseRemindAtFromClient } from '@/lib/reminder-datetime'
+import {
+  cancelReminderEmailJob,
+  scheduleReminderEmailJob,
+} from '@/lib/reminder-scheduler'
+
 export const dynamic = 'force-dynamic'
 
 export async function PATCH(
@@ -56,6 +61,15 @@ export async function PATCH(
       },
     })
 
+    try {
+      if (data.remindAt) {
+        await cancelReminderEmailJob(id)
+        await scheduleReminderEmailJob(reminder.id, reminder.remindAt)
+      }
+    } catch (e) {
+      console.error('[Reminders] Inngest reschedule failed:', e)
+    }
+
     return NextResponse.json({ reminder })
   } catch (error) {
     console.error('Error updating reminder:', error)
@@ -83,6 +97,11 @@ export async function DELETE(
     }
 
     await prisma.leadReminder.delete({ where: { id } })
+    try {
+      await cancelReminderEmailJob(id)
+    } catch (e) {
+      console.error('[Reminders] Inngest cancel failed:', e)
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting reminder:', error)

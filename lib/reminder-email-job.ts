@@ -1,7 +1,7 @@
 import { prisma } from './prisma'
 import { sendReminderEmail } from './reminder-email'
 
-/** Send reminder email for one lead_reminders row (used by Agenda + manual catch-up). */
+/** Send reminder email for one lead_reminders row (used by Inngest + manual catch-up). */
 export async function sendReminderEmailById(reminderId: string): Promise<boolean> {
   const r = await prisma.leadReminder.findUnique({
     where: { id: reminderId },
