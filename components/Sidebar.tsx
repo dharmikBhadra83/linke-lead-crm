@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { LayoutDashboard, BarChart3, LogOut, X, Menu, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, BarChart3, LogOut, X, Menu, ClipboardList, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -52,6 +52,16 @@ export function Sidebar({ user, onLogout, isOpen: controlledIsOpen, onToggle }: 
       path: '/dashboard',
       active: pathname === '/dashboard',
     },
+    ...(user?.role === 'admin' || user?.role === 'outreach'
+      ? [
+          {
+            label: 'Reminders',
+            icon: Bell,
+            path: '/dashboard/reminders',
+            active: pathname === '/dashboard/reminders',
+          },
+        ]
+      : []),
   ]
 
   return (

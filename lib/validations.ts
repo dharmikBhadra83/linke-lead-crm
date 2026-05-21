@@ -28,6 +28,11 @@ export const createLeadSchema = z.object({
 export const updateLeadSchema = createLeadSchema.partial().extend({
   status: z.enum(['new', 'requested', 'texted', 'replied', 'meeting_booked', 'first_followup', 'second_followup', 'junk', 'closed', 'commented']).optional(),
   assignedToId: z.string().optional().nullable(),
+  outOfLocation: z.boolean().optional(),
+})
+
+export const toggleLeadOutOfLocationSchema = z.object({
+  outOfLocation: z.boolean(),
 })
 
 export const claimLeadSchema = z.object({
@@ -58,4 +63,15 @@ export const updateTaskSchema = z.object({
   assignedToId: z.string().min(1, 'Assign to a user').optional(),
   createdAt: z.string().optional(),
   dueAt: z.string().optional(),
+})
+
+export const createLeadReminderSchema = z.object({
+  leadId: z.string().min(1, 'Lead is required'),
+  remindAt: z.string().min(1, 'Reminder date and time is required'),
+  note: z.string().optional(),
+})
+
+export const updateLeadReminderSchema = z.object({
+  remindAt: z.string().optional(),
+  note: z.string().optional().nullable(),
 })

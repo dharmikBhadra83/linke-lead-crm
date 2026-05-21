@@ -42,6 +42,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { LeadFormDialog } from '@/components/LeadFormDialog'
+import { SetReminderDialog } from '@/components/SetReminderDialog'
 import { LEAD_STATUS_LABELS, LEAD_STATUSES, SYSTEMS, SYSTEM_LABELS, USER_ROLE_LABELS } from '@/lib/constants'
 import { ChevronDown } from 'lucide-react'
 import {
@@ -65,6 +66,7 @@ interface Lead {
   status: string
   system: string
   notes: string | null
+  outOfLocation: boolean
   assignedToId: string | null
   assignedTo: {
     id: string
@@ -138,6 +140,7 @@ export default function DashboardPage() {
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [popoverOpen, setPopoverOpen] = useState(false)
+  const [reminderLead, setReminderLead] = useState<{ id: string; name: string } | null>(null)
 
   const checkSession = useCallback(async () => {
     try {
@@ -417,6 +420,27 @@ export default function DashboardPage() {
     }
   }
 
+  const handleOutOfLocationChange = async (leadId: string, outOfLocation: boolean) => {
+    setLeads((prev) =>
+      prev.map((l) => (l.id === leadId ? { ...l, outOfLocation } : l))
+    )
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outOfLocation }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        fetchLeads()
+        alert(data.error || 'Failed to update row')
+      }
+    } catch {
+      fetchLeads()
+      alert('Failed to update row')
+    }
+  }
+
   const handleStatusChange = async (leadId: string, newStatus: string) => {
     try {
       const response = await fetch(`/api/leads/${leadId}/status`, {
@@ -497,6 +521,11 @@ export default function DashboardPage() {
   const canChangeStatus = (lead: Lead) => {
     if (user?.role === 'admin') return true
     if (user?.role === 'lead_gen' && !lead.assignedToId) return false
+    if (user?.role === 'outreach' && lead.assignedToId === user.id) return true
+    return false
+  }
+  const canSetReminder = (lead: Lead) => {
+    if (user?.role === 'admin' && lead.assignedToId) return true
     if (user?.role === 'outreach' && lead.assignedToId === user.id) return true
     return false
   }
@@ -724,6 +753,9 @@ export default function DashboardPage() {
                     <Table className="w-full" style={{ minWidth: '1900px' }}>
                       <TableHeader>
                         <TableRow className="bg-muted/50">
+                          <TableHead className="w-12 min-w-[48px] font-semibold text-center">
+                            Out of location
+                          </TableHead>
                           <TableHead className="min-w-[160px] whitespace-nowrap font-semibold">Name</TableHead>
                           <TableHead className="min-w-[120px] whitespace-nowrap font-semibold">Created</TableHead>
                           <TableHead className="min-w-[180px] whitespace-nowrap font-semibold">profile_url</TableHead>
@@ -744,7 +776,22 @@ export default function DashboardPage() {
                       </TableHeader>
                     <TableBody>
                       {leads.map((lead) => (
-                        <TableRow key={lead.id}>
+                        <TableRow
+                          key={lead.id}
+                          className={cn(
+                            lead.outOfLocation &&
+                              'bg-red-50 dark:bg-red-950/25'
+                          )}
+                        >
+                          <TableCell className="text-center align-middle">
+                            <Checkbox
+                              checked={lead.outOfLocation}
+                              onCheckedChange={(checked) =>
+                                handleOutOfLocationChange(lead.id, checked === true)
+                              }
+                              aria-label={`Out of location for ${lead.name}`}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium">{lead.name}</TableCell>
                           <TableCell>
                             {new Date(lead.createdAt).toLocaleDateString()}
@@ -923,6 +970,15 @@ export default function DashboardPage() {
                                       Edit
                                     </DropdownMenuItem>
                                   )}
+                                  {canSetReminder(lead) && (
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        setReminderLead({ id: lead.id, name: lead.name })
+                                      }
+                                    >
+                                      Set reminder
+                                    </DropdownMenuItem>
+                                  )}
                                   <DropdownMenuItem
                                     onClick={() => handleViewHistory(lead)}
                                   >
@@ -1021,6 +1077,15 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {reminderLead && (
+        <SetReminderDialog
+          open={!!reminderLead}
+          onOpenChange={(open) => !open && setReminderLead(null)}
+          leadId={reminderLead.id}
+          leadName={reminderLead.name}
+        />
+      )}
+
       {/* Add Lead Dialog */}
       <LeadFormDialog
         open={showAddDialog}
@@ -1040,6 +1105,7 @@ export default function DashboardPage() {
           }}
           leadId={editingLead.id}
           isAdmin={user?.role === 'admin'}
+          enableReminder={canSetReminder(editingLead)}
           initialData={{
             name: editingLead.name,
             email: editingLead.email || '',

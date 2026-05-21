@@ -41,6 +41,7 @@ model User {
   id        String   @id @default(cuid())
   username  String   @unique
   password  String
+  email     String?  
   role      UserRole @default(outreach)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -49,6 +50,7 @@ model User {
   statusHistory StatusHistory[]
   assignedTasks  Task[]  @relation("AssignedTasks")
   createdTasks   Task[]  @relation("CreatedTasks")
+  leadReminders  LeadReminder[]
 
   @@map("users")
 }
@@ -65,6 +67,7 @@ model Lead {
   system          System     @default(linkedin_one)
   assignedToId    String?
   notes           String?
+  outOfLocation   Boolean    @default(false) @map("out_of_location")
   textedAt        DateTime?
   firstFollowupAt DateTime?
   secondFollowupAt DateTime?
@@ -76,6 +79,7 @@ model Lead {
 
   assignedTo User?           @relation("AssignedLeads", fields: [assignedToId], references: [id], onDelete: SetNull)
   statusHistory StatusHistory[]
+  reminders     LeadReminder[]
 
   @@index([status])
   @@index([system])
@@ -130,4 +134,24 @@ model Task {
   @@index([createdAt])
   @@index([status])
   @@map("tasks")
+}
+
+model LeadReminder {
+  id          String    @id @default(cuid())
+  leadId      String
+  userId      String    // user to remind (typically lead assignee)
+  remindAt    DateTime
+  note        String?
+  emailSentAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([leadId])
+  @@index([remindAt])
+  @@index([emailSentAt])
+  @@map("lead_reminders")
 }

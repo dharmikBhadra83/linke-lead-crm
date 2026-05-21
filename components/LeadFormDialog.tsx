@@ -20,6 +20,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { LEAD_STATUS_LABELS, LEAD_STATUSES, SYSTEMS, SYSTEM_LABELS } from '@/lib/constants'
+import { ReminderDateTimeFields } from '@/components/ReminderDateTimeFields'
+import { buildRemindAtIso, getRemindAtFormValues } from '@/lib/reminder-datetime'
 
 interface LeadFormData {
   name: string
@@ -47,6 +49,8 @@ interface LeadFormDialogProps {
   leadId?: string
   initialData?: Partial<LeadFormData>
   isAdmin?: boolean
+  /** Show conversation reminder fields when editing a claimed lead */
+  enableReminder?: boolean
 }
 
 export function LeadFormDialog({
@@ -56,6 +60,7 @@ export function LeadFormDialog({
   leadId,
   initialData,
   isAdmin = false,
+  enableReminder = false,
 }: LeadFormDialogProps) {
   const [formData, setFormData] = useState<LeadFormData>({
     name: '',
@@ -73,6 +78,10 @@ export function LeadFormDialog({
   const [error, setError] = useState('')
   const [outreachUsers, setOutreachUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [reminderId, setReminderId] = useState<string | null>(null)
+  const [reminderDate, setReminderDate] = useState('')
+  const [reminderTime, setReminderTime] = useState('')
+  const [reminderNote, setReminderNote] = useState('')
 
   // Fetch outreach users when dialog opens (admin only)
   useEffect(() => {
@@ -80,6 +89,32 @@ export function LeadFormDialog({
       fetchOutreachUsers()
     }
   }, [open, isAdmin])
+
+  useEffect(() => {
+    if (!open || !leadId || !enableReminder) {
+      setReminderId(null)
+      setReminderDate('')
+      setReminderTime('')
+      setReminderNote('')
+      return
+    }
+    const loadReminder = async () => {
+      try {
+        const res = await fetch(`/api/reminders?leadId=${leadId}`)
+        const data = await res.json()
+        if (!res.ok || !data.reminders?.length) return
+        const r = data.reminders[0]
+        setReminderId(r.id)
+        const { date, time24 } = getRemindAtFormValues(r.remindAt)
+        setReminderDate(date)
+        setReminderTime(time24)
+        setReminderNote(r.note ?? '')
+      } catch {
+        // ignore
+      }
+    }
+    loadReminder()
+  }, [open, leadId, enableReminder])
 
   useEffect(() => {
     if (open) {
@@ -154,6 +189,32 @@ export function LeadFormDialog({
         setError(data.error || 'Failed to save lead')
         setLoading(false)
         return
+      }
+
+      if (leadId && enableReminder && reminderDate && reminderTime) {
+        const remindAt = buildRemindAtIso(reminderDate, reminderTime)
+        if (reminderId) {
+          await fetch(`/api/reminders/${reminderId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              remindAt,
+              note: reminderNote.trim() || null,
+            }),
+          })
+        } else {
+          await fetch('/api/reminders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              leadId,
+              remindAt,
+              note: reminderNote.trim() || undefined,
+            }),
+          })
+        }
+      } else if (leadId && enableReminder && reminderId && !reminderDate) {
+        await fetch(`/api/reminders/${reminderId}`, { method: 'DELETE' })
       }
 
       onSuccess()
@@ -330,6 +391,24 @@ export function LeadFormDialog({
                 disabled={loading}
               />
             </div>
+            {leadId && enableReminder && (
+              <div className="rounded-md border border-border p-4 bg-muted/30">
+                <p className="text-sm font-medium mb-1">Conversation reminder</p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Shows on the Reminders tab on this date. Email sent when due if the lead is still
+                  assigned to you.
+                </p>
+                <ReminderDateTimeFields
+                  date={reminderDate}
+                  onDateChange={setReminderDate}
+                  time={reminderTime}
+                  onTimeChange={setReminderTime}
+                  note={reminderNote}
+                  onNoteChange={setReminderNote}
+                  disabled={loading}
+                />
+              </div>
+            )}
           </div>
           {error && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded mb-4">

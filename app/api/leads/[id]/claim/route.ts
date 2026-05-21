@@ -11,10 +11,12 @@ export async function POST(
   try {
     const session = await getSession()
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'Session expired or invalid. Please log out and log in again.' },
+        { status: 401 }
+      )
     }
 
-    // Only outreach can claim leads
     requireRole(session, ['outreach', 'admin'])
 
     const leadId = params.id
@@ -87,6 +89,13 @@ export async function POST(
   } catch (error: any) {
     if (error.message === 'Unauthorized' || error.message === 'Forbidden') {
       return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+
+    if (error.code === 'P2003') {
+      return NextResponse.json(
+        { error: 'Session expired or invalid. Please log out and log in again.' },
+        { status: 401 }
+      )
     }
 
     console.error('Error claiming lead:', error)

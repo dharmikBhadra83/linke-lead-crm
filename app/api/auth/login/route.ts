@@ -8,10 +8,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const validatedData = loginSchema.parse(body)
+    const username = validatedData.username.trim()
 
-    // Find user by username
-    const user = await prisma.user.findUnique({
-      where: { username: validatedData.username },
+    const user = await prisma.user.findFirst({
+      where: {
+        username: { equals: username, mode: 'insensitive' },
+      },
     })
 
     if (!user) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { requireRole } from '@/lib/auth'
-import { updateLeadSchema, changeStatusSchema } from '@/lib/validations'
+import { updateLeadSchema, changeStatusSchema, toggleLeadOutOfLocationSchema } from '@/lib/validations'
 
 // GET /api/leads/[id] - Get a single lead with history
 export async function GET(
@@ -182,6 +182,58 @@ export async function PUT(
       { error: 'Internal server error' },
       { status: 500 }
     )
+  }
+}
+
+// PATCH /api/leads/[id] - Toggle out-of-location checkbox
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { outOfLocation } = toggleLeadOutOfLocationSchema.parse(body)
+
+    const existingLead = await prisma.lead.findUnique({
+      where: { id: params.id },
+    })
+
+    if (!existingLead) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    if (session.role === 'lead_gen' && existingLead.assignedToId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (
+      session.role === 'outreach' &&
+      existingLead.assignedToId &&
+      existingLead.assignedToId !== session.id
+    ) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const lead = await prisma.lead.update({
+      where: { id: params.id },
+      data: { outOfLocation },
+      include: {
+        assignedTo: { select: { id: true, username: true } },
+      },
+    })
+
+    return NextResponse.json({ lead })
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'ZodError') {
+      return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+    }
+    console.error('Error toggling row mark:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
