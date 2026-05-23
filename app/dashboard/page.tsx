@@ -119,6 +119,7 @@ export default function DashboardPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
   const [appliedStatuses, setAppliedStatuses] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
+  const [pageJumpInput, setPageJumpInput] = useState('1')
   const [pagination, setPagination] = useState<{
     page: number
     limit: number
@@ -296,6 +297,22 @@ export default function DashboardPage() {
       fetchLeads()
     }
   }, [page, user, fetchLeads])
+
+  useEffect(() => {
+    setPageJumpInput(String(page))
+  }, [page])
+
+  const goToPage = () => {
+    if (loading || !pagination) return
+    const parsed = parseInt(pageJumpInput.trim(), 10)
+    if (Number.isNaN(parsed)) {
+      setPageJumpInput(String(page))
+      return
+    }
+    const target = Math.min(Math.max(1, parsed), pagination.totalPages)
+    setPageJumpInput(String(target))
+    if (target !== page) setPage(target)
+  }
 
   const handleLogout = async () => {
     try {
@@ -1006,12 +1023,13 @@ export default function DashboardPage() {
 
               {/* Pagination */}
               {pagination && pagination.totalPages > 1 && (
-                <div className="mt-6 space-y-2">
+                <div className="mt-6 space-y-3">
                   <div className="text-sm text-muted-foreground text-center">
                     Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
                     {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
                     {pagination.total} leads
                   </div>
+                  <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-6">
                   <Pagination>
                     <PaginationContent>
                       <PaginationItem>
@@ -1068,6 +1086,32 @@ export default function DashboardPage() {
                       </PaginationItem>
                     </PaginationContent>
                   </Pagination>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <label htmlFor="leads-page-jump" className="text-sm text-muted-foreground whitespace-nowrap">
+                      Go to page
+                    </label>
+                    <Input
+                      id="leads-page-jump"
+                      type="number"
+                      min={1}
+                      max={pagination.totalPages}
+                      value={pageJumpInput}
+                      onChange={(e) => setPageJumpInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          goToPage()
+                        }
+                      }}
+                      disabled={loading}
+                      className="h-8 w-20 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      aria-label={`Go to page, 1 to ${pagination.totalPages}`}
+                    />
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                      of {pagination.totalPages}
+                    </span>
+                  </div>
+                  </div>
                 </div>
               )}
               </div>
